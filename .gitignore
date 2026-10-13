@@ -1,0 +1,23 @@
+# Binaries and build artifacts
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Environment files
+.env
+!.env.example
+
+# Backup & scratch
+_backup_pre_cleanup/
+scratch/
+
+# OS and IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
