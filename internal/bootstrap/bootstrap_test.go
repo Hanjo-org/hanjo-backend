@@ -36,6 +36,31 @@ func TestEndpoints(t *testing.T) {
 			url:          "/",
 			expectedCode: http.StatusOK,
 		},
+		{
+			name:         "Swagger UI HTML",
+			url:          "/docs",
+			expectedCode: http.StatusOK,
+		},
+		{
+			name:         "Master Swagger YAML",
+			url:          "/docs/swagger.yaml",
+			expectedCode: http.StatusOK,
+		},
+		{
+			name:         "Auth Module YAML",
+			url:          "/docs/modules/auth.yaml",
+			expectedCode: http.StatusOK,
+		},
+		{
+			name:         "Organization Module YAML",
+			url:          "/docs/modules/organization.yaml",
+			expectedCode: http.StatusOK,
+		},
+		{
+			name:         "Swagger Alias Redirect",
+			url:          "/swagger",
+			expectedCode: http.StatusFound,
+		},
 	}
 
 	for _, tc := range tests {

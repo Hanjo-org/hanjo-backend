@@ -1,0 +1,462 @@
+openapi: 3.0.3
+info:
+  title: Hanjo ERP & POS API
+  description: >-
+    ### Enterprise Multi-Tenant F&B ERP & POS Backend
+    
+    Layanan RESTful API Backend untuk Sistem ERP dan POS FnB Multi-Tenant (Coffee Shop & Restoran).
+    Dibangun menggunakan **Golang**, **Clean Architecture & DDD**, **Fiber v3**, **GORM**, dan **PostgreSQL**.
+    
+    ---
+    
+    ### 🔑 Kredensial Demo Seeder (Untuk "Try it out"):
+    
+    | Peran / Akun | Identifier (Email/Username) | Password / PIN | Scope |
+    | :--- | :--- | :--- | :--- |
+    | **Developer / Super Admin** | `dev@hanjo.id` / `developer` | `Password123!` | Global (Full Access) |
+    | **Owner (Holding HQ)** | `owner@harmoni.id` / `owner` | `Password123!` | Organization HQ |
+    | **Brand Manager** | `manager.daily@harmoni.id` | `Password123!` | Brand (`Daily Coffee`) |
+    | **Branch Manager** | `manager.kemang@harmoni.id` | `Password123!` | Outlet (`Daily Coffee - Kemang`) |
+    | **Kasir POS Kemang** | Outlet ID: `04826e26-f9e9-4200-b653-18b2b652c13c`<br>Username: `kasir.kemang` | PIN: `123456` | POS Tablet Kemang |
+    | **Barista Kemang** | Outlet ID: `04826e26-f9e9-4200-b653-18b2b652c13c`<br>Username: `barista.kemang` | PIN: `654321` | Kitchen / Bar Display |
+    
+  version: 1.0.0
+  contact:
+    name: Hanjo Engineering Team
+    email: dev@hanjo.id
+servers:
+  - url: http://localhost:8080
+    description: Local Development Server (Port 8080)
+
+tags:
+  - name: System
+    description: Health check, service status, and runtime observability
+  - name: Auth
+    description: Dual-UX Authentication (Dashboard Web & POS Tablet), JWT RS256, Session RTR
+
+paths:
+  /:
+    get:
+      tags:
+        - System
+      summary: API Root / Welcome
+      description: Memeriksa metadata layanan backend dan ketersediaan dokumentasi API.
+      responses:
+        '200':
+          description: Layanan aktif
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+              example:
+                success: true
+                message: "welcome to Hanjo ERP & POS API"
+                data:
+                  name: "hanjo-backend"
+                  version: "1.0.0"
+                  docs: "/docs"
+
+  /health:
+    get:
+      tags:
+        - System
+      summary: Service Health Check
+      description: Memeriksa kesehatan server dan koneksi database PostgreSQL.
+      responses:
+        '200':
+          description: Server dan database sehat
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+              example:
+                success: true
+                message: "service is healthy"
+                data:
+                  status: "ok"
+                  uptime: "1h 42m"
+
+  /api/v1/auth/login:
+    post:
+      tags:
+        - Auth
+      summary: Dashboard Web Login (Email & Password)
+      description: >-
+        Otentikasi kredensial pengguna untuk Dashboard Web ERP (Developer, Owner Holding, Brand Manager, Branch Manager).
+        Mengembalikan Access Token JWT RS256 di body response dan menyetel Refresh Token ke dalam HttpOnly Secure Cookie.
+        Mendukung login via Email atau Username.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login berhasil, access token dan profil dikembalikan.
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+                example: refresh_token=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...; Path=/api/v1/auth; HttpOnly; SameSite=Lax
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSuccessResponse'
+        '400':
+          description: Format JSON tidak valid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Kredensial tidak valid (email/username atau password salah).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '422':
+          description: Validasi input gagal.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /api/v1/auth/pos/login:
+    post:
+      tags:
+        - Auth
+      summary: Fast POS Login (Outlet ID, Username & PIN)
+      description: >-
+        Otentikasi cepat untuk aplikasi Kasir POS Tablet dan Kitchen/Bar Display di outlet fisik.
+        Menggunakan kombinasi Outlet ID (UUID), Username staff, dan 6-digit numeric PIN.
+        Memverifikasi bahwa staf benar-benar terdaftar aktif pada outlet fisik tersebut.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/POSLoginRequest'
+      responses:
+        '200':
+          description: Login POS berhasil.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSuccessResponse'
+        '400':
+          description: Format JSON tidak valid atau parameter outlet_id bukan UUID valid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Kredensial atau PIN POS salah.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '422':
+          description: Validasi input gagal.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /api/v1/auth/refresh:
+    post:
+      tags:
+        - Auth
+      summary: Refresh Access Token
+      description: >-
+        Memperbarui Access Token yang telah kedaluwarsa menggunakan Refresh Token yang tersimpan di HttpOnly Cookie
+        atau yang dikirimkan pada request body (opsional untuk mobile/POS client tanpa cookie support).
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshTokenRequest'
+      responses:
+        '200':
+          description: Token berhasil diperbarui.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefreshTokenSuccessResponse'
+        '401':
+          description: Refresh token tidak ditemukan, kedaluwarsa, atau tidak valid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /api/v1/auth/logout:
+    post:
+      tags:
+        - Auth
+      summary: Logout & Revoke Session
+      description: >-
+        Mengakhiri sesi pengguna aktif dan menghapus cookie HttpOnly `refresh_token`.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Logout berhasil.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+              example:
+                success: true
+                message: "logout berhasil"
+                data: null
+        '401':
+          description: Token otentikasi tidak disertakan atau tidak valid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /api/v1/auth/me:
+    get:
+      tags:
+        - Auth
+      summary: Get Current User Profile & Tenant Context
+      description: >-
+        Mendapatkan informasi profil lengkap pengguna yang sedang terotentikasi,
+        termasuk relasi hierarki multi-tenant: Organization ID, Brand ID, dan Outlet ID.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Profil pengguna berhasil diambil.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfileResponse'
+        '401':
+          description: Token otentikasi tidak valid atau kedaluwarsa.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Pengguna tidak ditemukan.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Masukkan Access Token JWT RS256 (format "Bearer <token>")
+
+  schemas:
+    SuccessEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "operasi berhasil"
+        data:
+          type: object
+
+    ErrorEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              example: "INVALID_CREDENTIALS"
+            message:
+              type: string
+              example: "email atau password salah"
+            details:
+              type: object
+              additionalProperties: true
+
+    LoginRequest:
+      type: object
+      required:
+        - identifier
+        - password
+      properties:
+        identifier:
+          type: string
+          description: Email akun atau username staf
+          example: "dev@hanjo.id"
+        password:
+          type: string
+          format: password
+          minLength: 6
+          description: Kata sandi pengguna
+          example: "Password123!"
+
+    POSLoginRequest:
+      type: object
+      required:
+        - outlet_id
+        - username
+        - pin
+      properties:
+        outlet_id:
+          type: string
+          format: uuid
+          description: ID unik Outlet fisik tempat terminal POS beroperasi
+          example: "04826e26-f9e9-4200-b653-18b2b652c13c"
+        username:
+          type: string
+          description: Username staf kasir / barista di outlet tersebut
+          example: "kasir.kemang"
+        pin:
+          type: string
+          pattern: '^[0-9]{4,8}$'
+          description: PIN numerik staf (4-8 digit)
+          example: "123456"
+
+    RefreshTokenRequest:
+      type: object
+      properties:
+        refresh_token:
+          type: string
+          description: Opsional jika dikirim via body alih-alih cookie
+          example: "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..."
+
+    TokenPair:
+      type: object
+      properties:
+        access_token:
+          type: string
+          example: "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..."
+        token_type:
+          type: string
+          example: "Bearer"
+        expires_in:
+          type: integer
+          description: Masa berlaku token dalam detik (900s = 15 menit)
+          example: 900
+        expires_at:
+          type: string
+          format: date-time
+          example: "2026-10-17T22:30:00Z"
+
+    UserOutput:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "a3f6cbd7-4ec3-4819-973a-8ffd5f4f8ad7"
+        organization_id:
+          type: string
+          format: uuid
+          example: "ebcf5d20-3fba-42dd-8d6b-4b5c859e028b"
+        brand_id:
+          type: string
+          format: uuid
+          nullable: true
+          example: null
+        outlet_id:
+          type: string
+          format: uuid
+          nullable: true
+          example: null
+        username:
+          type: string
+          example: "developer"
+        email:
+          type: string
+          example: "dev@hanjo.id"
+        status:
+          type: string
+          example: "ACTIVE"
+
+    AuthSuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "login berhasil"
+        data:
+          type: object
+          properties:
+            user:
+              $ref: '#/components/schemas/UserOutput'
+            tokens:
+              $ref: '#/components/schemas/TokenPair'
+
+    RefreshTokenSuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "token berhasil diperbarui"
+        data:
+          $ref: '#/components/schemas/TokenPair'
+
+    UserProfileResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "profil berhasil diambil"
+        data:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+              example: "a3f6cbd7-4ec3-4819-973a-8ffd5f4f8ad7"
+            organization_id:
+              type: string
+              format: uuid
+              example: "ebcf5d20-3fba-42dd-8d6b-4b5c859e028b"
+            brand_id:
+              type: string
+              format: uuid
+              nullable: true
+              example: null
+            outlet_id:
+              type: string
+              format: uuid
+              nullable: true
+              example: null
+            username:
+              type: string
+              example: "developer"
+            email:
+              type: string
+              example: "dev@hanjo.id"
+            status:
+              type: string
+              example: "ACTIVE"
+            created_at:
+              type: string
+              format: date-time
+              example: "2026-10-17T22:15:50Z"
+            updated_at:
+              type: string
+              format: date-time
+              example: "2026-10-17T22:15:50Z"
