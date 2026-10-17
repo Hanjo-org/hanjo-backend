@@ -113,7 +113,7 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("DB_PORT", 5432)
 	v.SetDefault("DB_NAME", "hanjo_db")
 	v.SetDefault("DB_USER", "postgres")
-	v.SetDefault("DB_PASSWORD", "postgres")
+	v.SetDefault("DB_PASSWORD", "")
 	v.SetDefault("DB_SSLMODE", "disable")
 	v.SetDefault("DB_TIMEZONE", "UTC")
 

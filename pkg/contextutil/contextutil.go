@@ -18,6 +18,7 @@ const (
 	UserEmailKey      contextKey = "user_email"
 	UserRoleKey       contextKey = "user_role"
 	OrganizationIDKey contextKey = "organization_id"
+	BrandIDKey        contextKey = "brand_id"
 	OutletIDKey       contextKey = "outlet_id"
 )
 
@@ -78,6 +79,20 @@ func SetOrganizationID(c fiber.Ctx, orgID string) {
 // GetOrganizationID retrieves the organization ID from fiber.Ctx locals.
 func GetOrganizationID(c fiber.Ctx) string {
 	val, ok := c.Locals(string(OrganizationIDKey)).(string)
+	if !ok {
+		return ""
+	}
+	return val
+}
+
+// SetBrandID sets the active brand ID in fiber.Ctx locals.
+func SetBrandID(c fiber.Ctx, brandID string) {
+	c.Locals(string(BrandIDKey), brandID)
+}
+
+// GetBrandID retrieves the active brand ID from fiber.Ctx locals.
+func GetBrandID(c fiber.Ctx) string {
+	val, ok := c.Locals(string(BrandIDKey)).(string)
 	if !ok {
 		return ""
 	}

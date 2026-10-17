@@ -36,6 +36,9 @@ func Auth(manager *jwt.Manager) fiber.Handler {
 		if claims.OrganizationID != "" {
 			contextutil.SetOrganizationID(c, claims.OrganizationID)
 		}
+		if claims.BrandID != "" {
+			contextutil.SetBrandID(c, claims.BrandID)
+		}
 		if claims.OutletID != "" {
 			contextutil.SetOutletID(c, claims.OutletID)
 		}

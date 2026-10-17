@@ -8,6 +8,8 @@ tmp/
 *.dylib
 *.test
 *.out
+*.log
+storage/logs/
 
 # Environment files
 .env

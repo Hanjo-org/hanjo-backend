@@ -1,4 +1,4 @@
-.PHONY: help dev run build test tidy lint docker-up docker-down migrate-create migrate-up migrate-down migrate-fresh migrate-version migrate-force
+.PHONY: help dev run build test tidy lint seed docker-up docker-down migrate-create migrate-up migrate-down migrate-fresh migrate-version migrate-force
 
 # Load .env file if present
 ifneq (,$(wildcard .env))
@@ -10,7 +10,7 @@ endif
 DB_HOST ?= localhost
 DB_PORT ?= 5432
 DB_USER ?= postgres
-DB_PASSWORD ?= postgres
+DB_PASSWORD ?=
 DB_NAME ?= hanjo_db
 DB_SSLMODE ?= disable
 DB_URL ?= postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)?sslmode=$(DB_SSLMODE)
@@ -23,6 +23,9 @@ dev: ## Run application with live reloading (Air)
 
 run: ## Run application locally
 	@go run ./cmd/api
+
+seed: ## Run database seeder (initial organization, brands, outlets, users)
+	@go run ./cmd/seed
 
 build: ## Build binary executable
 	@mkdir -p bin
