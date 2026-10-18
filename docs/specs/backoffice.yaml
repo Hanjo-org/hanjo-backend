@@ -1,0 +1,898 @@
+openapi: 3.0.3
+info:
+  title: Hanjo ERP - Back-Office API (Web Dashboard)
+  description: >-
+    ### Back-Office & Corporate Management RESTful API
+    
+    Spesifikasi OpenAPI khusus untuk aplikasi **Web Dashboard Back-Office Hanjo ERP**.
+    Digunakan oleh **Owner (Holding HQ)**, **Finance HQ**, **Brand Manager**, dan **Branch Manager** untuk
+    mengelola operasional bisnis multi-tenant, hierarki organisasi, master data, dan manajemen staf.
+    
+    ---
+    
+    ### 🔑 Kredensial Demo Back-Office:
+    
+    | Peran / Akun | Email / Identifier | Password | Scope Akses |
+    | :--- | :--- | :--- | :--- |
+    | **Developer / Super Admin** | `dev@hanjo.id` | `Password123!` | Global (Full Access) |
+    | **Owner (Holding HQ)** | `owner@harmoni.id` | `Password123!` | Organization HQ |
+    | **Brand Manager** | `manager.daily@harmoni.id` | `Password123!` | Brand (`Daily Coffee`) |
+    | **Branch Manager** | `manager.kemang@harmoni.id` | `Password123!` | Outlet (`Daily Coffee - Kemang`) |
+  version: 1.0.0
+  contact:
+    name: Hanjo Engineering Team
+    email: dev@hanjo.id
+servers:
+  - url: http://localhost:8080
+    description: Local Development Server
+
+tags:
+  - name: Auth & Session
+    description: Otentikasi Web Dashboard (Email & Password), Refresh Token RTR, dan Logout
+  - name: User Management
+    description: Manajemen Staf & Karyawan (CRUD, Role/Outlet Assignment, Status Toggle, Soft-Delete)
+  - name: Multi-Tenancy Hierarchy
+    description: Manajemen Hierarki 3-Tier (Organization Holding, Brand, dan Outlet Fisik)
+
+paths:
+  /api/v1/auth/login:
+    post:
+      tags:
+        - Auth & Session
+      summary: Login Web Dashboard (Email + Password)
+      description: Otentikasi pengguna back-office menggunakan email atau username dan password.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login berhasil. Mengembalikan Access Token RS256 dan menyetel HttpOnly Cookie `refresh_token`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSuccessResponse'
+        '401':
+          description: Kredensial tidak valid atau akun dinonaktifkan.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '429':
+          description: Terlalu banyak percobaan login gagal, akun terkunci sementara selama 15 menit.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /api/v1/auth/refresh:
+    post:
+      tags:
+        - Auth & Session
+      summary: Refresh Access Token
+      description: Memperbarui access token baru menggunakan refresh token cookie atau payload body.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refresh_token:
+                  type: string
+      responses:
+        '200':
+          description: Token berhasil diperbarui.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefreshTokenSuccessResponse'
+        '401':
+          description: Refresh token tidak valid atau kedaluwarsa.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /api/v1/auth/logout:
+    post:
+      tags:
+        - Auth & Session
+      summary: Logout Session
+      description: Mengakhiri sesi pengguna aktif dan menghapus cookie HttpOnly `refresh_token`.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Logout berhasil.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        '401':
+          description: Tidak terotentikasi.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /api/v1/auth/me:
+    get:
+      tags:
+        - Auth & Session
+      summary: Profil Pengguna Aktif & Scope Tenant
+      description: Mendapatkan informasi profil pengguna yang sedang login beserta Organization ID, Brand ID, dan Outlet ID.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Profil berhasil diambil.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfileResponse'
+        '401':
+          description: Tidak terotentikasi.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /api/v1/auth/me/password:
+    put:
+      tags:
+        - Auth & Session
+      summary: Ganti Password Pengguna Sendiri
+      description: >-
+        Pengguna dashboard dapat mengubah password mereka sendiri setelah memasukkan password saat ini dengan benar.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangePasswordRequest'
+      responses:
+        '200':
+          description: Password berhasil diperbarui.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        '400':
+          description: Password saat ini tidak sesuai.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '422':
+          description: Password baru tidak boleh sama dengan password lama, atau panjang minimal 8 karakter.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /api/v1/auth/me/pin:
+    put:
+      tags:
+        - Auth & Session
+      summary: Ganti PIN POS Sendiri
+      description: >-
+        Mengatur atau mengubah PIN 4-8 digit untuk mesin kasir/POS tablet.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangePINRequest'
+      responses:
+        '200':
+          description: PIN berhasil diperbarui.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        '400':
+          description: PIN saat ini salah atau wajib diisi.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '422':
+          description: PIN baru tidak boleh sama dengan PIN saat ini.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /api/v1/users/lookup:
+    get:
+      tags:
+        - User Management
+      summary: Lookup Pengguna / Combobox Options
+      description: >-
+        Mengambil daftar staf aktif secara ringkas (hanya ID dan Nama) khusus untuk kebutuhan
+        dropdown / combobox pada UI formulir dengan pagination terukur dan bebas data sensitif.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: outlet_id
+          in: query
+          description: Filter staf berdasarkan outlet tertentu
+          schema:
+            type: string
+            format: uuid
+        - name: brand_id
+          in: query
+          description: Filter staf berdasarkan brand tertentu
+          schema:
+            type: string
+            format: uuid
+        - name: search
+          in: query
+          description: Pencarian nama staf
+          schema:
+            type: string
+        - name: page
+          in: query
+          description: Nomor halaman (default 1)
+          schema:
+            type: integer
+            default: 1
+        - name: per_page
+          in: query
+          description: Jumlah baris data per halaman (default 20, max 100)
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Daftar lookup berhasil diambil.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserLookupResponse'
+        '401':
+          description: Tidak terotentikasi.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /api/v1/users:
+    get:
+      tags:
+        - User Management
+      summary: Daftar Pengguna & Staf (Paginated + Preloaded)
+      description: >-
+        Mengambil daftar staf di dalam organisasi dengan pagination, filter pencarian,
+        serta otomatis menyertakan ringkasan relasi Organization, Brand, dan Outlet
+        secara optimal (in-memory batch fetching, 0 query N+1).
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          description: Nomor halaman (default 1)
+          schema:
+            type: integer
+            default: 1
+        - name: per_page
+          in: query
+          description: Jumlah item per halaman (default 20, max 100)
+          schema:
+            type: integer
+            default: 20
+        - name: brand_id
+          in: query
+          description: Filter berdasarkan ID Brand
+          schema:
+            type: string
+            format: uuid
+        - name: outlet_id
+          in: query
+          description: Filter berdasarkan ID Outlet fisik
+          schema:
+            type: string
+            format: uuid
+        - name: status
+          in: query
+          description: Filter status akun (ACTIVE, INACTIVE, SUSPENDED)
+          schema:
+            type: string
+            enum: [ACTIVE, INACTIVE, SUSPENDED]
+        - name: search
+          in: query
+          description: Cari berdasarkan username atau email
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Daftar pengguna berhasil diambil.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserListResponse'
+        '401':
+          description: Tidak terotentikasi.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+    post:
+      tags:
+        - User Management
+      summary: Tambah Staf / Pengguna Baru
+      description: Menambahkan staf, kasir, atau manajer baru. Password di-hash menggunakan Bcrypt.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserRequest'
+      responses:
+        '201':
+          description: Pengguna berhasil dibuat.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserDetailResponse'
+        '400':
+          description: Hierarki brand/outlet tidak valid atau format request keliru.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Email atau username sudah terdaftar dalam organisasi ini.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '422':
+          description: Validasi input gagal.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /api/v1/users/{id}:
+    get:
+      tags:
+        - User Management
+      summary: Detail Pengguna
+      description: Mengambil data detail profil pengguna beserta ringkasan relasi hierarki multi-tenant.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: UUID pengguna
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Data pengguna ditemukan.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserDetailResponse'
+        '404':
+          description: Pengguna tidak ditemukan.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+    put:
+      tags:
+        - User Management
+      summary: Update Data Pengguna
+      description: Mengubah profil staf, re-assign outlet atau brand, serta update password/PIN.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: UUID pengguna
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserRequest'
+      responses:
+        '200':
+          description: Data pengguna berhasil diperbarui.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserDetailResponse'
+        '404':
+          description: Pengguna tidak ditemukan.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+    delete:
+      tags:
+        - User Management
+      summary: Hapus Pengguna (Soft Delete)
+      description: Menonaktifkan dan melakukan soft-delete akun staf.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: UUID pengguna
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Pengguna berhasil dihapus.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        '404':
+          description: Pengguna tidak ditemukan.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /api/v1/users/{id}/status:
+    patch:
+      tags:
+        - User Management
+      summary: Toggle Status Pengguna
+      description: Mengubah status akun staf (ACTIVE, INACTIVE, SUSPENDED).
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: UUID pengguna
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserStatusRequest'
+      responses:
+        '200':
+          description: Status pengguna berhasil diubah.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserDetailResponse'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    SuccessEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+        data:
+          nullable: true
+        error:
+          nullable: true
+          example: null
+
+    ErrorEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+        data:
+          nullable: true
+          example: null
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              type: object
+              nullable: true
+
+    LoginRequest:
+      type: object
+      required:
+        - identifier
+        - password
+      properties:
+        identifier:
+          type: string
+          example: "owner@harmoni.id"
+        password:
+          type: string
+          example: "Password123!"
+
+    AuthSuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "login berhasil"
+        data:
+          type: object
+          properties:
+            user:
+              $ref: '#/components/schemas/UserOutput'
+            tokens:
+              $ref: '#/components/schemas/TokenPair'
+
+    RefreshTokenSuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "token berhasil diperbarui"
+        data:
+          $ref: '#/components/schemas/TokenPair'
+
+    UserProfileResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "profil berhasil diambil"
+        data:
+          $ref: '#/components/schemas/UserOutput'
+
+    UserOutput:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        organization_id:
+          type: string
+          format: uuid
+        brand_id:
+          type: string
+          format: uuid
+          nullable: true
+        outlet_id:
+          type: string
+          format: uuid
+          nullable: true
+        username:
+          type: string
+        email:
+          type: string
+          format: email
+        status:
+          type: string
+          example: ACTIVE
+
+    TokenPair:
+      type: object
+      properties:
+        access_token:
+          type: string
+        refresh_token:
+          type: string
+        token_type:
+          type: string
+          example: Bearer
+        expires_in:
+          type: integer
+          example: 28800
+        expires_at:
+          type: string
+          format: date-time
+
+    OrganizationSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+
+    BrandSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+        logo_url:
+          type: string
+          nullable: true
+
+    OutletSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        code:
+          type: string
+        address:
+          type: string
+
+    UserWithRelations:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        organization_id:
+          type: string
+          format: uuid
+        brand_id:
+          type: string
+          format: uuid
+          nullable: true
+        outlet_id:
+          type: string
+          format: uuid
+          nullable: true
+        username:
+          type: string
+        email:
+          type: string
+          format: email
+        status:
+          type: string
+          example: ACTIVE
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        organization:
+          $ref: '#/components/schemas/OrganizationSummary'
+        brand:
+          $ref: '#/components/schemas/BrandSummary'
+          nullable: true
+        outlet:
+          $ref: '#/components/schemas/OutletSummary'
+          nullable: true
+
+    UserListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "daftar pengguna berhasil diambil"
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserWithRelations'
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'
+
+    UserDetailResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "data pengguna berhasil ditemukan"
+        data:
+          $ref: '#/components/schemas/UserWithRelations'
+
+    CreateUserRequest:
+      type: object
+      required:
+        - username
+        - email
+        - password
+      properties:
+        brand_id:
+          type: string
+          format: uuid
+          nullable: true
+        outlet_id:
+          type: string
+          format: uuid
+          nullable: true
+        username:
+          type: string
+          example: "kasir.kemang"
+        email:
+          type: string
+          format: email
+          example: "kasir.kemang@harmoni.id"
+        password:
+          type: string
+          format: password
+          example: "Password123!"
+        pin:
+          type: string
+          example: "123456"
+        status:
+          type: string
+          enum: [ACTIVE, INACTIVE, SUSPENDED]
+          default: ACTIVE
+
+    UpdateUserRequest:
+      type: object
+      properties:
+        brand_id:
+          type: string
+          format: uuid
+          nullable: true
+        outlet_id:
+          type: string
+          format: uuid
+          nullable: true
+        username:
+          type: string
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+        pin:
+          type: string
+        status:
+          type: string
+          enum: [ACTIVE, INACTIVE, SUSPENDED]
+
+    UpdateUserStatusRequest:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum: [ACTIVE, INACTIVE, SUSPENDED]
+
+    UserLookupItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        outlet_id:
+          type: string
+          format: uuid
+          nullable: true
+        brand_id:
+          type: string
+          format: uuid
+          nullable: true
+
+    UserLookupResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "lookup pengguna berhasil diambil"
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserLookupItem'
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'
+        error:
+          nullable: true
+          example: null
+
+    ChangePasswordRequest:
+      type: object
+      required:
+        - current_password
+        - new_password
+      properties:
+        current_password:
+          type: string
+          example: "OldSecret123"
+        new_password:
+          type: string
+          minLength: 8
+          example: "NewSecret456"
+
+    ChangePINRequest:
+      type: object
+      required:
+        - new_pin
+      properties:
+        current_pin:
+          type: string
+          minLength: 4
+          maxLength: 8
+          example: "123456"
+          description: Wajib jika pengguna sebelumnya telah memiliki PIN
+        new_pin:
+          type: string
+          minLength: 4
+          maxLength: 8
+          example: "654321"
+
+    PaginationMeta:
+      type: object
+      properties:
+        page:
+          type: integer
+          example: 1
+        per_page:
+          type: integer
+          example: 20
+        total_data:
+          type: integer
+          example: 1
+        total_pages:
+          type: integer
+          example: 1
+
+    ResponseMeta:
+      type: object
+      properties:
+        pagination:
+          $ref: '#/components/schemas/PaginationMeta'
+        summary:
+          type: object
+          nullable: true
+          description: "Objek agregasi atau ringkasan opsional (misal laporan total finansial/transaksi)"
+

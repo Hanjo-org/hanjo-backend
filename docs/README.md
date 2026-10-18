@@ -6,9 +6,13 @@ Dokumentasi RESTful API untuk **Hanjo ERP & POS Backend** dirancang modular per 
 docs/
 ├── docs.go                  # Go embed.FS (seluruh berkas dokumentasi di-embed ke binary aplikasi)
 ├── index.html               # Interactive Swagger UI kustom dengan multi-spec dropdown switcher
-├── swagger.yaml             # Master API Specification (seluruh endpoint sistem)
+├── swagger.yaml             # Master Gateway & Architecture Spec (arsitektur, status & info sistem)
+├── specs/
+│   ├── backoffice.yaml      # 🖥️ Back-Office API (Web Dashboard: Users, Org, Inventory, Catalog)
+│   └── pos.yaml             # 📱 Point of Sale API (Tablet Kasir: Fast PIN, Orders, Shift, Meja)
 ├── modules/
 │   ├── auth.yaml            # Modul Otentikasi, POS PIN, JWT RS256, & Session
+│   ├── user.yaml            # Modul User & Staff Management
 │   └── organization.yaml    # Arsitektur & Model Hierarki Multi-Tenancy 3-Tier
 └── README.md                # Panduan dokumentasi ini
 ```
@@ -21,14 +25,17 @@ Ketika server backend berjalan (`make dev` atau `make run` pada port default `80
 
 * **Interactive Swagger UI**: [http://localhost:8080/docs](http://localhost:8080/docs) *(atau alias [/swagger](http://localhost:8080/swagger))*
   * Dilengkapi dropdown selector di topbar untuk berganti antar spesifikasi:
-    1. **🌟 Master Spec (All Features)**
-    2. **🔐 Auth & Session Module**
-    3. **🏢 Multi-Tenancy Hierarchy (3-Tier)**
+    1. **🖥️ Back-Office API (Web Dashboard / HQ)**
+    2. **📱 Point of Sale (POS) API (Tablet Kasir & Barista)**
+    3. **🌟 Master Gateway & Overview**
+    4. **👥 Module: User Management**
+    5. **🔐 Module: Authentication & Session**
+    6. **🏢 Module: Multi-Tenancy (3-Tier)**
   * Mendukung tombol **"Try it out"** langsung untuk menguji request HTTP.
   * Mendukung tombol **"Authorize"** dengan memasukkan Access Token JWT (`Bearer <access_token>`).
-* **Master Specification (YAML)**: [http://localhost:8080/docs/swagger.yaml](http://localhost:8080/docs/swagger.yaml)
-* **Auth Module Spec (YAML)**: [http://localhost:8080/docs/modules/auth.yaml](http://localhost:8080/docs/modules/auth.yaml)
-* **Organization Spec (YAML)**: [http://localhost:8080/docs/modules/organization.yaml](http://localhost:8080/docs/modules/organization.yaml)
+* **Back-Office Spec (YAML)**: [http://localhost:8080/docs/specs/backoffice.yaml](http://localhost:8080/docs/specs/backoffice.yaml)
+* **POS Tablet Spec (YAML)**: [http://localhost:8080/docs/specs/pos.yaml](http://localhost:8080/docs/specs/pos.yaml)
+* **Master Gateway Spec (YAML)**: [http://localhost:8080/docs/swagger.yaml](http://localhost:8080/docs/swagger.yaml)
 
 ---
 

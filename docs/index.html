@@ -120,9 +120,9 @@
       <span class="hanjo-topbar-badge">v1.0.0</span>
     </div>
     <nav class="hanjo-topbar-nav">
-      <a href="/" target="_blank">Root API</a>
+      <a href="/docs/specs/backoffice.yaml" target="_blank">Back-Office YAML</a>
+      <a href="/docs/specs/pos.yaml" target="_blank">POS Tablet YAML</a>
       <a href="/docs/swagger.yaml" target="_blank">Master YAML</a>
-      <a href="/docs/modules/auth.yaml" target="_blank">Auth YAML</a>
       <a href="/health" target="_blank">Health Check</a>
     </nav>
   </header>
@@ -135,11 +135,14 @@
     window.onload = function() {
       const ui = SwaggerUIBundle({
         urls: [
-          { url: "/docs/swagger.yaml", name: "🌟 Master Spec (All Features)" },
-          { url: "/docs/modules/auth.yaml", name: "🔐 Auth & Session Module" },
-          { url: "/docs/modules/organization.yaml", name: "🏢 Multi-Tenancy Hierarchy (3-Tier)" }
+          { url: "/docs/specs/backoffice.yaml", name: "🖥️ Back-Office API (Web Dashboard / HQ)" },
+          { url: "/docs/specs/pos.yaml", name: "📱 Point of Sale (POS) API (Tablet Kasir & Barista)" },
+          { url: "/docs/swagger.yaml", name: "🌟 Master Gateway & Overview" },
+          { url: "/docs/modules/user.yaml", name: "👥 Module: User Management" },
+          { url: "/docs/modules/auth.yaml", name: "🔐 Module: Authentication & Session" },
+          { url: "/docs/modules/organization.yaml", name: "🏢 Module: Multi-Tenancy (3-Tier)" }
         ],
-        "urls.primaryName": "🌟 Master Spec (All Features)",
+        "urls.primaryName": "🖥️ Back-Office API (Web Dashboard / HQ)",
         dom_id: '#swagger-ui',
         deepLinking: true,
         persistAuthorization: true,

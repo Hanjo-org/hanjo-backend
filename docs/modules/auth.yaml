@@ -63,6 +63,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+        '429':
+          description: Terlalu banyak percobaan login gagal, akun terkunci sementara selama 15 menit.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
 
   /api/v1/auth/pos/login:
     post:
@@ -73,6 +79,7 @@ paths:
         Otentikasi cepat untuk aplikasi Kasir POS Tablet dan Kitchen/Bar Display di outlet fisik.
         Menggunakan kombinasi Outlet ID (UUID), Username staff, dan 6-digit numeric PIN.
         Memverifikasi bahwa staf benar-benar terdaftar aktif pada outlet yang bersangkutan.
+        Dilengkapi proteksi anti brute-force otomatis (terkunci 15 menit setelah 5x salah PIN).
       requestBody:
         required: true
         content:
@@ -100,6 +107,12 @@ paths:
                 $ref: '#/components/schemas/ErrorEnvelope'
         '422':
           description: Validasi input gagal.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '429':
+          description: Terlalu banyak percobaan PIN salah, kasir terkunci sementara selama 15 menit.
           content:
             application/json:
               schema:
@@ -185,6 +198,76 @@ paths:
                 $ref: '#/components/schemas/ErrorEnvelope'
         '404':
           description: Pengguna tidak ditemukan.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /api/v1/auth/me/password:
+    put:
+      tags:
+        - Auth
+      summary: Self-Service Update Password
+      description: >-
+        Mengubah password akun pengguna yang sedang login setelah memvalidasi password saat ini.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangePasswordRequest'
+      responses:
+        '200':
+          description: Password berhasil diperbarui.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        '400':
+          description: Password saat ini tidak sesuai atau format body tidak valid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '422':
+          description: Password baru tidak boleh sama dengan password saat ini, atau validasi gagal.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /api/v1/auth/me/pin:
+    put:
+      tags:
+        - Auth
+      summary: Self-Service Update POS PIN
+      description: >-
+        Mengubah atau mengatur PIN 4-8 digit pengguna untuk mesin kasir/POS tablet.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangePINRequest'
+      responses:
+        '200':
+          description: PIN kasir berhasil diperbarui.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        '400':
+          description: PIN saat ini tidak sesuai atau wajib diisi.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '422':
+          description: PIN baru tidak boleh sama dengan PIN saat ini, atau validasi gagal.
           content:
             application/json:
               schema:
@@ -402,3 +485,34 @@ components:
               type: string
               format: date-time
               example: "2026-10-17T22:15:50Z"
+
+    ChangePasswordRequest:
+      type: object
+      required:
+        - current_password
+        - new_password
+      properties:
+        current_password:
+          type: string
+          example: "OldSecret123"
+        new_password:
+          type: string
+          minLength: 8
+          example: "NewSecret456"
+
+    ChangePINRequest:
+      type: object
+      required:
+        - new_pin
+      properties:
+        current_pin:
+          type: string
+          minLength: 4
+          maxLength: 8
+          example: "123456"
+          description: Diperlukan jika pengguna sebelumnya telah mengatur PIN.
+        new_pin:
+          type: string
+          minLength: 4
+          maxLength: 8
+          example: "654321"

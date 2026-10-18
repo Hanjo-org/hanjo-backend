@@ -1,0 +1,454 @@
+openapi: 3.0.3
+info:
+  title: Hanjo ERP - Point of Sale (POS) API (Tablet Kasir & Barista)
+  description: >-
+    ### Point of Sale (POS) RESTful API
+    
+    Spesifikasi OpenAPI khusus untuk aplikasi **Tablet Kasir, Kitchen Display System (KDS), dan Waiter Hanjo POS**.
+    Didesain untuk operasional gerai fisik FnB dengan mekanisme **Fast PIN Switching** (4-8 digit numeric PIN),
+    manajemen shift kasir, dan isolasi tenant per `outlet_id`.
+    
+    ---
+    
+    ### 🔑 Kredensial Demo Kasir & Barista POS:
+    
+    | Peran / Akun | Outlet ID | Username | PIN POS | Deskripsi |
+    | :--- | :--- | :--- | :--- | :--- |
+    | **Kasir Kemang** | `04826e26-f9e9-4200-b653-18b2b652c13c` | `kasir.kemang` | `123456` | POS Kasir Utama Cabang Kemang |
+    | **Barista Kemang** | `04826e26-f9e9-4200-b653-18b2b652c13c` | `barista.kemang` | `654321` | Kitchen & Bar Display Kemang |
+  version: 1.0.0
+  contact:
+    name: Hanjo Engineering Team
+    email: dev@hanjo.id
+servers:
+  - url: http://localhost:8080
+    description: Local Development Server
+
+tags:
+  - name: POS Authentication
+    description: Fast PIN Login di Outlet Fisik, Rotasi Token RS256, dan Logout Mesin POS
+
+paths:
+  /api/v1/auth/pos/login:
+    post:
+      tags:
+        - POS Authentication
+      summary: Quick PIN Login Mesin Kasir / POS Tablet
+      description: >-
+        Login cepat kasir/barista di outlet fisik menggunakan kombinasi `outlet_id`, `username`, dan `pin` (4-8 digit).
+        Mengembalikan Access Token RS256 dan menyetel HttpOnly Cookie `refresh_token`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/POSLoginRequest'
+      responses:
+        '200':
+          description: Login POS berhasil.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSuccessResponse'
+        '400':
+          description: Outlet ID tidak valid atau request body keliru.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: PIN salah atau kasir tidak terdaftar pada outlet tersebut.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '429':
+          description: Terlalu banyak percobaan PIN salah, kasir terkunci sementara selama 15 menit.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /api/v1/auth/refresh:
+    post:
+      tags:
+        - POS Authentication
+      summary: Refresh Access Token Mesin POS
+      description: Memperbarui access token kasir tanpa login ulang.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refresh_token:
+                  type: string
+      responses:
+        '200':
+          description: Token berhasil diperbarui.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefreshTokenSuccessResponse'
+        '401':
+          description: Token kedaluwarsa.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /api/v1/auth/logout:
+    post:
+      tags:
+        - POS Authentication
+      summary: Logout Sesi Kasir
+      description: Mengakhiri sesi kasir aktif pada tablet POS.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Logout berhasil.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        '401':
+          description: Tidak terotentikasi.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /api/v1/auth/me:
+    get:
+      tags:
+        - POS Authentication
+      summary: Profil Kasir & Scope Outlet Aktif
+      description: Mendapatkan data kasir yang sedang aktif beserta konfirmasi `outlet_id` dan `brand_id`.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Profil kasir berhasil diambil.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfileResponse'
+        '401':
+          description: Tidak terotentikasi.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /api/v1/auth/me/pin:
+    put:
+      tags:
+        - POS Authentication
+      summary: Ganti PIN Kasir Sendiri
+      description: >-
+        Kasir atau staf outlet dapat mengganti 4-8 digit PIN mereka sendiri langsung di mesin POS tablet.
+        Jika pengguna telah memiliki PIN sebelumnya, `current_pin` wajib disertakan.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangePINRequest'
+      responses:
+        '200':
+          description: PIN kasir berhasil diperbarui.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        '400':
+          description: PIN saat ini salah atau wajib diisi.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '422':
+          description: PIN baru tidak boleh sama dengan PIN saat ini.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /api/v1/users/lookup:
+    get:
+      tags:
+        - POS Authentication
+      summary: Lookup Kasir & Barista Aktif di Outlet
+      description: >-
+        Mengambil daftar staf/kasir aktif pada outlet fisik yang bersangkutan
+        untuk mengisi opsi combobox pergantian kasir atau penugasan barista dengan pagination terukur.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: outlet_id
+          in: query
+          description: Filter staf berdasarkan outlet tertentu
+          schema:
+            type: string
+            format: uuid
+        - name: search
+          in: query
+          description: Pencarian nama kasir/staf
+          schema:
+            type: string
+        - name: page
+          in: query
+          description: Nomor halaman (default 1)
+          schema:
+            type: integer
+            default: 1
+        - name: per_page
+          in: query
+          description: Jumlah baris data per halaman (default 20, max 100)
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Daftar lookup berhasil diambil.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserLookupResponse'
+        '401':
+          description: Tidak terotentikasi.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    SuccessEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+        data:
+          nullable: true
+        error:
+          nullable: true
+          example: null
+
+    ErrorEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+        data:
+          nullable: true
+          example: null
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              type: object
+              nullable: true
+
+    POSLoginRequest:
+      type: object
+      required:
+        - outlet_id
+        - username
+        - pin
+      properties:
+        outlet_id:
+          type: string
+          format: uuid
+          example: "04826e26-f9e9-4200-b653-18b2b652c13c"
+        username:
+          type: string
+          example: "kasir.kemang"
+        pin:
+          type: string
+          example: "123456"
+          description: "PIN numerik kasir (4-8 digit)"
+
+    AuthSuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "pos login berhasil"
+        data:
+          type: object
+          properties:
+            user:
+              $ref: '#/components/schemas/UserOutput'
+            tokens:
+              $ref: '#/components/schemas/TokenPair'
+
+    RefreshTokenSuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "token berhasil diperbarui"
+        data:
+          $ref: '#/components/schemas/TokenPair'
+
+    UserProfileResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "profil berhasil diambil"
+        data:
+          $ref: '#/components/schemas/UserOutput'
+
+    UserOutput:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        organization_id:
+          type: string
+          format: uuid
+        brand_id:
+          type: string
+          format: uuid
+          nullable: true
+        outlet_id:
+          type: string
+          format: uuid
+          nullable: true
+        username:
+          type: string
+        email:
+          type: string
+          format: email
+        status:
+          type: string
+          example: ACTIVE
+
+    TokenPair:
+      type: object
+      properties:
+        access_token:
+          type: string
+        refresh_token:
+          type: string
+        token_type:
+          type: string
+          example: Bearer
+        expires_in:
+          type: integer
+          example: 28800
+        expires_at:
+          type: string
+          format: date-time
+
+    UserLookupItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        outlet_id:
+          type: string
+          format: uuid
+          nullable: true
+        brand_id:
+          type: string
+          format: uuid
+          nullable: true
+
+    UserLookupResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "lookup pengguna berhasil diambil"
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserLookupItem'
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'
+        error:
+          nullable: true
+          example: null
+
+    ChangePINRequest:
+      type: object
+      required:
+        - new_pin
+      properties:
+        current_pin:
+          type: string
+          minLength: 4
+          maxLength: 8
+          example: "123456"
+          description: Wajib disertakan jika pengguna telah memiliki PIN sebelumnya
+        new_pin:
+          type: string
+          minLength: 4
+          maxLength: 8
+          example: "654321"
+
+    PaginationMeta:
+      type: object
+      properties:
+        page:
+          type: integer
+          example: 1
+        per_page:
+          type: integer
+          example: 20
+        total_data:
+          type: integer
+          example: 1
+        total_pages:
+          type: integer
+          example: 1
+
+    ResponseMeta:
+      type: object
+      properties:
+        pagination:
+          $ref: '#/components/schemas/PaginationMeta'
+        summary:
+          type: object
+          nullable: true
+          description: "Objek agregasi atau ringkasan opsional (misal laporan total finansial/transaksi)"
+
