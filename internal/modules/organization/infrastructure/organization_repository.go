@@ -31,6 +31,24 @@ func (r *organizationRepository) GetByID(ctx context.Context, id string) (*domai
 	return model.ToDomain(), nil
 }
 
+func (r *organizationRepository) GetByIDs(ctx context.Context, ids []string) ([]*domain.Organization, error) {
+	if len(ids) == 0 {
+		return []*domain.Organization{}, nil
+	}
+
+	var models []OrganizationModel
+	err := r.db.WithContext(ctx).Where("id IN ?", ids).Find(&models).Error
+	if err != nil {
+		return nil, err
+	}
+
+	orgs := make([]*domain.Organization, len(models))
+	for i := range models {
+		orgs[i] = models[i].ToDomain()
+	}
+	return orgs, nil
+}
+
 func (r *organizationRepository) GetBySlug(ctx context.Context, slug string) (*domain.Organization, error) {
 	var model OrganizationModel
 	err := r.db.WithContext(ctx).First(&model, "slug = ?", slug).Error

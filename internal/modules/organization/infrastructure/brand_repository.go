@@ -31,6 +31,24 @@ func (r *brandRepository) GetByID(ctx context.Context, id string) (*domain.Brand
 	return model.ToDomain(), nil
 }
 
+func (r *brandRepository) GetByIDs(ctx context.Context, ids []string) ([]*domain.Brand, error) {
+	if len(ids) == 0 {
+		return []*domain.Brand{}, nil
+	}
+
+	var models []BrandModel
+	err := r.db.WithContext(ctx).Where("id IN ?", ids).Find(&models).Error
+	if err != nil {
+		return nil, err
+	}
+
+	brands := make([]*domain.Brand, len(models))
+	for i := range models {
+		brands[i] = models[i].ToDomain()
+	}
+	return brands, nil
+}
+
 func (r *brandRepository) GetBySlug(ctx context.Context, orgID, slug string) (*domain.Brand, error) {
 	var model BrandModel
 	err := r.db.WithContext(ctx).First(&model, "organization_id = ? AND slug = ?", orgID, slug).Error

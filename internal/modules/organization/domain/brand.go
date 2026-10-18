@@ -40,6 +40,7 @@ func NewBrand(orgID, name, slug string) *Brand {
 // BrandRepository defines persistence contracts for Brand entities.
 type BrandRepository interface {
 	GetByID(ctx context.Context, id string) (*Brand, error)
+	GetByIDs(ctx context.Context, ids []string) ([]*Brand, error)
 	GetBySlug(ctx context.Context, orgID, slug string) (*Brand, error)
 	ListByOrganization(ctx context.Context, orgID string, params response.PaginationParams) ([]*Brand, int64, error)
 	Create(ctx context.Context, brand *Brand) error

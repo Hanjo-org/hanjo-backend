@@ -36,6 +36,7 @@ func NewOrganization(name, slug string) *Organization {
 // OrganizationRepository defines persistence contracts for Organization entities.
 type OrganizationRepository interface {
 	GetByID(ctx context.Context, id string) (*Organization, error)
+	GetByIDs(ctx context.Context, ids []string) ([]*Organization, error)
 	GetBySlug(ctx context.Context, slug string) (*Organization, error)
 	List(ctx context.Context, params response.PaginationParams) ([]*Organization, int64, error)
 	Create(ctx context.Context, org *Organization) error

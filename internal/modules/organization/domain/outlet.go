@@ -45,6 +45,7 @@ func NewOutlet(orgID, brandID, name, code, address string) *Outlet {
 // OutletRepository defines persistence contracts for Outlet entities.
 type OutletRepository interface {
 	GetByID(ctx context.Context, id string) (*Outlet, error)
+	GetByIDs(ctx context.Context, ids []string) ([]*Outlet, error)
 	GetByCode(ctx context.Context, orgID, code string) (*Outlet, error)
 	ListByBrand(ctx context.Context, brandID string, params response.PaginationParams) ([]*Outlet, int64, error)
 	ListByOrganization(ctx context.Context, orgID string, params response.PaginationParams) ([]*Outlet, int64, error)

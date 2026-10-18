@@ -31,6 +31,24 @@ func (r *outletRepository) GetByID(ctx context.Context, id string) (*domain.Outl
 	return model.ToDomain(), nil
 }
 
+func (r *outletRepository) GetByIDs(ctx context.Context, ids []string) ([]*domain.Outlet, error) {
+	if len(ids) == 0 {
+		return []*domain.Outlet{}, nil
+	}
+
+	var models []OutletModel
+	err := r.db.WithContext(ctx).Where("id IN ?", ids).Find(&models).Error
+	if err != nil {
+		return nil, err
+	}
+
+	outlets := make([]*domain.Outlet, len(models))
+	for i := range models {
+		outlets[i] = models[i].ToDomain()
+	}
+	return outlets, nil
+}
+
 func (r *outletRepository) GetByCode(ctx context.Context, orgID, code string) (*domain.Outlet, error) {
 	var model OutletModel
 	err := r.db.WithContext(ctx).First(&model, "organization_id = ? AND code = ?", orgID, code).Error
