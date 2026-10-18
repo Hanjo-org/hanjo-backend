@@ -13,8 +13,8 @@ import (
 type User struct {
 	ID             string     `json:"id"`
 	OrganizationID string     `json:"organization_id"`
-	BrandID        *string    `json:"brand_id,omitempty"`
-	OutletID       *string    `json:"outlet_id,omitempty"`
+	BrandID        *string    `json:"brand_id"`
+	OutletID       *string    `json:"outlet_id"`
 	Username       string     `json:"username"`
 	Email          string     `json:"email"`
 	Password       string     `json:"-"`
@@ -40,6 +40,54 @@ func NewUser(orgID, username, email, password string) *User {
 	}
 }
 
+// OrganizationSummary represents minimal organization details embedded in user queries.
+type OrganizationSummary struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Slug string `json:"slug"`
+}
+
+// BrandSummary represents minimal brand details embedded in user queries.
+type BrandSummary struct {
+	ID      string  `json:"id"`
+	Name    string  `json:"name"`
+	Slug    string  `json:"slug"`
+	LogoURL *string `json:"logo_url"`
+}
+
+// OutletSummary represents minimal outlet details embedded in user queries.
+type OutletSummary struct {
+	ID      string  `json:"id"`
+	Name    string  `json:"name"`
+	Code    string  `json:"code"`
+	Address string  `json:"address"`
+}
+
+// UserWithRelations embeds related organization, brand, and outlet summaries with a User.
+type UserWithRelations struct {
+	*User
+	Organization *OrganizationSummary `json:"organization"`
+	Brand        *BrandSummary        `json:"brand"`
+	Outlet       *OutletSummary       `json:"outlet"`
+}
+
+// UserLookup represents a lightweight reference of an active user for UI comboboxes and dropdowns.
+type UserLookup struct {
+	ID       string  `json:"id"`
+	Name     string  `json:"name"`
+	OutletID *string `json:"outlet_id"`
+	BrandID  *string `json:"brand_id"`
+}
+
+// UserFilter defines query criteria for listing users.
+type UserFilter struct {
+	OrganizationID string
+	BrandID        *string
+	OutletID       *string
+	Status         *string
+	Search         *string
+}
+
 // UserRepository defines persistence contracts for User entities.
 type UserRepository interface {
 	GetByID(ctx context.Context, id string) (*User, error)
@@ -47,8 +95,10 @@ type UserRepository interface {
 	GetByEmail(ctx context.Context, email string) (*User, error)
 	GetByUsername(ctx context.Context, orgID, username string) (*User, error)
 	GetByOutletAndUsername(ctx context.Context, outletID, username string) (*User, error)
+	List(ctx context.Context, filter UserFilter, params response.PaginationParams) ([]*User, int64, error)
 	ListByOrganization(ctx context.Context, orgID string, params response.PaginationParams) ([]*User, int64, error)
 	ListByOutlet(ctx context.Context, outletID string, params response.PaginationParams) ([]*User, int64, error)
+	GetLookup(ctx context.Context, filter UserFilter, params response.PaginationParams) ([]*UserLookup, int64, error)
 	Create(ctx context.Context, user *User) error
 	Update(ctx context.Context, user *User) error
 	Delete(ctx context.Context, id string) error
