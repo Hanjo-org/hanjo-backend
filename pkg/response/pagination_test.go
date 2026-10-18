@@ -11,13 +11,21 @@ import (
 
 func TestNewMeta(t *testing.T) {
 	meta := response.NewMeta(1, 20, 95)
-	if meta.Page != 1 || meta.PerPage != 20 || meta.TotalData != 95 || meta.TotalPages != 5 {
-		t.Errorf("unexpected meta calculation: %+v", meta)
+	if meta.Pagination == nil {
+		t.Fatal("expected non-nil pagination meta")
+	}
+	if meta.Pagination.Page != 1 || meta.Pagination.PerPage != 20 || meta.Pagination.TotalData != 95 || meta.Pagination.TotalPages != 5 {
+		t.Errorf("unexpected meta calculation: %+v", meta.Pagination)
 	}
 
 	metaZero := response.NewMeta(1, 0, 0)
-	if metaZero.TotalPages != 0 {
-		t.Errorf("expected 0 total pages for 0 limit, got %d", metaZero.TotalPages)
+	if metaZero.Pagination.TotalPages != 0 {
+		t.Errorf("expected 0 total pages for 0 limit, got %d", metaZero.Pagination.TotalPages)
+	}
+
+	meta.WithSummary(map[string]any{"total_revenue": 100000})
+	if meta.Summary == nil {
+		t.Error("expected non-nil summary")
 	}
 }
 
