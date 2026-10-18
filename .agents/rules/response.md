@@ -10,10 +10,13 @@ All Delivery layer HTTP handlers **MUST** use `pkg/response`. Never call `c.JSON
   "message": "resource created successfully",
   "data": { ... },
   "meta": {
-    "page": 1,
-    "per_page": 20,
-    "total_data": 50,
-    "total_pages": 3
+    "pagination": {
+      "page": 1,
+      "per_page": 20,
+      "total_data": 50,
+      "total_pages": 3
+    },
+    "summary": { ... }
   },
   "error": null
 }
@@ -21,7 +24,7 @@ All Delivery layer HTTP handlers **MUST** use `pkg/response`. Never call `c.JSON
 
 *   `data`: Always present in the payload.
 *   `message`: Short human-readable summary (omitted if empty).
-*   `meta`: Present only on paginated list endpoints.
+*   `meta`: Present on paginated list and lookup endpoints. Contains nested `pagination` and optional `summary`.
 *   `error`: Present on failure (`{"code": "...", "message": "...", "details": { ... }}}`).
 
 ## 2. Handler Helpers

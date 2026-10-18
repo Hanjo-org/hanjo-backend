@@ -15,26 +15,40 @@ const (
 	MaxPerPage     = 100
 )
 
-// Meta carries pagination metadata alongside list data.
-type Meta struct {
+// PaginationMeta carries pagination numbers and totals.
+type PaginationMeta struct {
 	Page       int   `json:"page"`
 	PerPage    int   `json:"per_page"`
 	TotalData  int64 `json:"total_data"`
 	TotalPages int   `json:"total_pages"`
 }
 
-// NewMeta computes total pages from total rows and limit.
+// Meta carries extensible metadata alongside list data (pagination, aggregations, summaries).
+type Meta struct {
+	Pagination *PaginationMeta `json:"pagination,omitempty"`
+	Summary    any             `json:"summary,omitempty"`
+}
+
+// NewMeta computes total pages from total rows and limit, returning a nested Meta instance.
 func NewMeta(page, perPage int, totalData int64) *Meta {
 	totalPages := 0
 	if perPage > 0 {
 		totalPages = int(math.Ceil(float64(totalData) / float64(perPage)))
 	}
 	return &Meta{
-		Page:       page,
-		PerPage:    perPage,
-		TotalData:  totalData,
-		TotalPages: totalPages,
+		Pagination: &PaginationMeta{
+			Page:       page,
+			PerPage:    perPage,
+			TotalData:  totalData,
+			TotalPages: totalPages,
+		},
 	}
+}
+
+// WithSummary attaches arbitrary summary/aggregation metrics to the Meta object.
+func (m *Meta) WithSummary(summary any) *Meta {
+	m.Summary = summary
+	return m
 }
 
 // PaginationParams holds clamped pagination and sorting options.

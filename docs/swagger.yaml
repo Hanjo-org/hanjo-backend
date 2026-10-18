@@ -1,0 +1,148 @@
+openapi: 3.0.3
+info:
+  title: Hanjo ERP & POS - Master Gateway & Architecture Specification
+  description: >-
+    ### Enterprise Multi-Tenant F&B ERP & POS Backend
+    
+    Layanan RESTful API Backend untuk Sistem ERP dan POS FnB Multi-Tenant (Coffee Shop & Restoran).
+    Dibangun menggunakan **Golang**, **Clean Architecture & DDD**, **Fiber v3**, **GORM**, dan **PostgreSQL**.
+    
+    ---
+    
+    ### 🏛️ Arsitektur Hierarki Multi-Tenancy 3-Tier:
+    
+    ```text
+    Tier 1: Organization (Holding / Corporate Management Group)
+            └── Tier 2: Brand (Merek / Konsep Bisnis Coffee Shop)
+                  └── Tier 3: Outlet (Cabang Toko Fisik / Lokasi Mesin POS)
+    ```
+    
+    ---
+    
+    ### 📑 Spesifikasi API Khusus Klien (Pilih dari Dropdown di Atas):
+    
+    Untuk mempermudah integrasi dan menghindari file dokumentasi yang terlalu besar (*monolithic bloat*),
+    kontrak API Hanjo ERP dipisahkan menjadi dua spesifikasi khusus:
+    
+    1. **🖥️ Back-Office API (Web Dashboard / HQ)**:
+       * Akses via dropdown atas atau [buka YAML](/docs/specs/backoffice.yaml).
+       * Khusus untuk Owner, Finance HQ, Brand Manager, dan Branch Manager.
+       * Mengelola Auth Email/Password, Manajemen Staf (`/users`), Hierarki Multi-Tenancy (`/organizations`, `/brands`, `/outlets`), dan Master Data.
+    2. **📱 Point of Sale (POS) API (Tablet Kasir & Barista)**:
+       * Akses via dropdown atas atau [buka YAML](/docs/specs/pos.yaml).
+       * Khusus untuk mesin kasir, kitchen display, dan pelayan toko fisik.
+       * Mengelola Quick Fast-PIN Switching, Shift Kasir, Transaksi POS, dan Manajemen Meja.
+    
+    ---
+    
+    ### 🔑 Kredensial Uji Coba Demo (Database Seeder):
+    
+    | Peran / Akun | Identifier (Email/Username) | Password / PIN | Scope Akses |
+    | :--- | :--- | :--- | :--- |
+    | **Developer / Super Admin** | `dev@hanjo.id` / `developer` | `Password123!` | Global (Full Access) |
+    | **Owner (Holding HQ)** | `owner@harmoni.id` / `owner` | `Password123!` | Organization HQ |
+    | **Brand Manager** | `manager.daily@harmoni.id` | `Password123!` | Brand (`Daily Coffee`) |
+    | **Branch Manager** | `manager.kemang@harmoni.id` | `Password123!` | Outlet (`Daily Coffee - Kemang`) |
+    | **Kasir POS Kemang** | Outlet ID: `04826e26-f9e9-4200-b653-18b2b652c13c`<br>Username: `kasir.kemang` | PIN: `123456` | POS Tablet Kemang |
+    | **Barista Kemang** | Outlet ID: `04826e26-f9e9-4200-b653-18b2b652c13c`<br>Username: `barista.kemang` | PIN: `654321` | Kitchen / Bar Display |
+    
+  version: 1.0.0
+  contact:
+    name: Hanjo Engineering Team
+    email: dev@hanjo.id
+servers:
+  - url: http://localhost:8080
+    description: Local Development Server (Port 8080)
+
+tags:
+  - name: System Gateway
+    description: Health check, service status, dan runtime observability
+
+paths:
+  /:
+    get:
+      tags:
+        - System Gateway
+      summary: API Root / Welcome Gateway
+      description: Memeriksa metadata layanan backend, status gateway, dan ketersediaan dokumentasi API.
+      responses:
+        '200':
+          description: Layanan aktif
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+              example:
+                success: true
+                message: "welcome to Hanjo ERP & POS API"
+                data:
+                  name: "hanjo-backend"
+                  version: "1.0.0"
+                  docs: "/docs"
+
+  /health:
+    get:
+      tags:
+        - System Gateway
+      summary: Service Health Check Probe
+      description: Liveness & readiness probe untuk monitoring status operasional service backend.
+      responses:
+        '200':
+          description: Layanan sehat
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+              example:
+                success: true
+                message: "service is healthy"
+                data:
+                  status: "ok"
+                  app: "hanjo-backend"
+                  env: "development"
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    SuccessEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "success"
+        data:
+          type: object
+          nullable: true
+        error:
+          nullable: true
+          example: null
+
+    ErrorEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+          example: "error occurred"
+        data:
+          nullable: true
+          example: null
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              example: "INTERNAL_ERROR"
+            message:
+              type: string
+              example: "internal error"

@@ -1,0 +1,254 @@
+openapi: 3.0.3
+info:
+  title: Hanjo ERP - Multi-Tenant Hierarchy Architecture
+  description: >-
+    Spesifikasi & Model Data Arsitektur 3-Tier Multi-Tenancy F&B Hanjo ERP
+    (Organization Holding -> Brand -> Outlet Fisik).
+  version: 1.0.0
+  contact:
+    name: Hanjo Engineering Team
+    email: dev@hanjo.id
+servers:
+  - url: http://localhost:8080
+    description: Local Development Server
+
+tags:
+  - name: Multi-Tenancy Hierarchy
+    description: Model hierarki 3-Tier (Organization Holding, Brand, dan Outlet Fisik)
+
+paths:
+  /api/v1/organizations/current:
+    get:
+      tags:
+        - Multi-Tenancy Hierarchy
+      summary: Detail Organisasi Holding Saat Ini
+      description: Mendapatkan data profil organisasi induk / holding perusahaan tempat akun bernaung.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Data organisasi holding berhasil diambil.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationResponse'
+        '401':
+          description: Tidak terotentikasi.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /api/v1/brands:
+    get:
+      tags:
+        - Multi-Tenancy Hierarchy
+      summary: Daftar Brand dalam Organisasi
+      description: Mendapatkan daftar seluruh brand / merek FnB yang dimiliki oleh organisasi holding.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Daftar brand berhasil diambil.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BrandListResponse'
+        '401':
+          description: Tidak terotentikasi.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /api/v1/outlets:
+    get:
+      tags:
+        - Multi-Tenancy Hierarchy
+      summary: Daftar Outlet Cabang Fisik
+      description: Mendapatkan daftar seluruh cabang outlet fisik, dapat difilter berdasarkan Brand ID.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: brand_id
+          in: query
+          required: false
+          description: Filter outlet berdasarkan Brand ID tertentu
+          schema:
+            type: string
+            format: uuid
+            example: "13f41f53-b15e-4cd1-8d1d-7208385af1ae"
+      responses:
+        '200':
+          description: Daftar outlet berhasil diambil.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OutletListResponse'
+        '401':
+          description: Tidak terotentikasi.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Masukkan Access Token JWT RS256 (format "Bearer <token>")
+
+  schemas:
+    SuccessEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "operasi berhasil"
+        data:
+          type: object
+
+    ErrorEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              example: "UNAUTHORIZED"
+            message:
+              type: string
+              example: "akses ditolak"
+            details:
+              type: object
+              additionalProperties: true
+
+    Organization:
+      type: object
+      description: Holding company / Parent organization level
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "ebcf5d20-3fba-42dd-8d6b-4b5c859e028b"
+        name:
+          type: string
+          example: "PT Harmoni Kuliner Bersama"
+        code:
+          type: string
+          example: "HKB"
+        email:
+          type: string
+          example: "hq@harmoni.id"
+        phone:
+          type: string
+          example: "0215550100"
+        status:
+          type: string
+          example: "ACTIVE"
+
+    Brand:
+      type: object
+      description: Coffee shop / Restaurant brand under an organization
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "13f41f53-b15e-4cd1-8d1d-7208385af1ae"
+        organization_id:
+          type: string
+          format: uuid
+          example: "ebcf5d20-3fba-42dd-8d6b-4b5c859e028b"
+        name:
+          type: string
+          example: "Daily Coffee"
+        code:
+          type: string
+          example: "DC"
+        description:
+          type: string
+          example: "Spesialis Kopi Susu Kekinian & Pastry Premium"
+        status:
+          type: string
+          example: "ACTIVE"
+
+    Outlet:
+      type: object
+      description: Physical branch location under a brand
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "04826e26-f9e9-4200-b653-18b2b652c13c"
+        organization_id:
+          type: string
+          format: uuid
+          example: "ebcf5d20-3fba-42dd-8d6b-4b5c859e028b"
+        brand_id:
+          type: string
+          format: uuid
+          example: "13f41f53-b15e-4cd1-8d1d-7208385af1ae"
+        name:
+          type: string
+          example: "Daily Coffee - Kemang"
+        code:
+          type: string
+          example: "DC-KMG"
+        address:
+          type: string
+          example: "Jl. Kemang Raya No. 45, Jakarta Selatan"
+        phone:
+          type: string
+          example: "08123456701"
+        status:
+          type: string
+          example: "ACTIVE"
+
+    OrganizationResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "data organisasi berhasil diambil"
+        data:
+          $ref: '#/components/schemas/Organization'
+
+    BrandListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "daftar brand berhasil diambil"
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Brand'
+
+    OutletListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "daftar outlet berhasil diambil"
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Outlet'

@@ -38,11 +38,14 @@ Whenever you are writing, refactoring, or generating code in this repository:
 11. **Use Skill for Observability**: When implementing health checks, probes, or metrics, execute according to `.agents/skills/observability-health/SKILL.md`.
 12. **Use Skill for Shared Utilities (pkg/)**: When implementing, refactoring, or consuming utilities, filters, scopes, transactions, or context claims, execute according to `.agents/skills/go-pkg-utils/SKILL.md`.
 13. **Financial Precision**: All prices, taxes, discounts, and monetary amounts MUST use `money.Money` (`pkg/money`). Never use float for currency calculations!
+14. **Multi-Tenancy 3-Tier Hierarchy**: Strictly adhere to the 3-Tier model (`Organization` -> `Brand` -> `Outlet`) documented in `.agents/rules/multi-tenancy.md` and `docs/knowledge/multi-tenant-hierarchy.md`. All queries must be tenant-isolated.
+15. **RBAC & Lookup Endpoints**: Strictly adhere to `.agents/rules/rbac-lookup.md` and `.agents/skills/fnb-rbac-lookup/SKILL.md`. Decouple administrative management endpoints (`GET /<entities>`) from operational UI comboboxes (`GET /<entities>/lookup`) with zero sensitive data leakage and active status filtering.
 
 ## Skills Index
 
 - [go-module-generator](.agents/skills/go-module-generator/SKILL.md): Scaffolding Clean Architecture + DDD modules.
 - [go-pkg-utils](.agents/skills/go-pkg-utils/SKILL.md): Cookbook and recipes for all shared utilities in `pkg/` (ptr, contextutil, gormscope, trx, strutil, response, validator, jwt, logger, password, money, limiter).
+- [fnb-rbac-lookup](.agents/skills/fnb-rbac-lookup/SKILL.md): Role-Based Access Control, multi-tenant hierarchy scoping, and lightweight Lookup endpoints for UI comboboxes.
 - [conventional-commit](.agents/skills/conventional-commit/SKILL.md): Standardized git commit messages with domain scope and changelog.
 - [go-best-practices](.agents/skills/go-best-practices/SKILL.md): GORM query optimization, memory preallocation, and concurrency safety.
 - [go-test-generator](.agents/skills/go-test-generator/SKILL.md): Table-driven unit tests, repository mocking, and Fiber handler tests.
@@ -51,8 +54,11 @@ Whenever you are writing, refactoring, or generating code in this repository:
 - [go-security-audit](.agents/skills/go-security-audit/SKILL.md): OWASP checklist, SQLi prevention, and log sanitization.
 - [observability-health](.agents/skills/observability-health/SKILL.md): Kubernetes liveness/readiness probes and Prometheus metrics.
 
-## Rules Index
+## Rules & Knowledge Index
 
+- [multi-tenancy.md](.agents/rules/multi-tenancy.md): 3-Tier FnB hierarchy, tenant scoping, and brand/outlet role segregation.
+- [rbac-lookup.md](.agents/rules/rbac-lookup.md): Decoupling administrative CRUD from operational lookup endpoints, RBAC matrix, and Fiber route ordering.
+- [multi-tenant-hierarchy.md](docs/knowledge/multi-tenant-hierarchy.md): Full business background, multi-brand coffee shop use case, and architectural diagram.
 - [architecture.md](.agents/rules/architecture.md): Complete guidelines for Directory Structure, Layers, Dependency Inversion, and Cross-Module Composition.
 - [naming-convention.md](.agents/rules/naming-convention.md): Rules for naming variables, structs, files, and interfaces across all layers.
 - [error-handling.md](.agents/rules/error-handling.md): Guidelines for custom sentinel errors, wrapping, and HTTP status code mapping.

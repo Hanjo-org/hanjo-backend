@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hanjo ERP & POS - Interactive API Documentation</title>
+  <link rel="icon" type="image/png" href="https://unpkg.com/swagger-ui-dist@5.18.2/favicon-32x32.png" sizes="32x32" />
+  <link rel="stylesheet" type="text/css" href="https://unpkg.com/swagger-ui-dist@5.18.2/swagger-ui.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    html {
+      box-sizing: border-box;
+      overflow-y: scroll;
+    }
+    *, *:before, *:after {
+      box-sizing: inherit;
+    }
+    body {
+      margin: 0;
+      background: #f8fafc;
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    .hanjo-topbar {
+      background: #0f172a;
+      color: #f8fafc;
+      padding: 14px 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      border-bottom: 2px solid #f59e0b;
+    }
+    .hanjo-topbar-brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 700;
+      font-size: 17px;
+      letter-spacing: -0.02em;
+    }
+    .hanjo-logo {
+      font-size: 22px;
+    }
+    .hanjo-topbar-badge {
+      background: linear-gradient(135deg, #d97706, #f59e0b);
+      color: #0f172a;
+      font-size: 11px;
+      font-weight: 800;
+      padding: 3px 9px;
+      border-radius: 9999px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .hanjo-topbar-nav {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      font-size: 13px;
+      font-weight: 500;
+    }
+    .hanjo-topbar-nav a {
+      color: #94a3b8;
+      text-decoration: none;
+      transition: color 0.2s ease;
+    }
+    .hanjo-topbar-nav a:hover {
+      color: #f59e0b;
+    }
+
+    /* Customize Swagger UI Topbar */
+    .swagger-ui .topbar {
+      background-color: #1e293b !important;
+      padding: 10px 0;
+      box-shadow: inset 0 -1px 0 rgba(255,255,255,0.05);
+    }
+    .swagger-ui .topbar .download-url-wrapper .select-label {
+      color: #cbd5e1 !important;
+      font-size: 13px;
+      margin-right: 10px;
+      font-weight: 600;
+    }
+    .swagger-ui .topbar .download-url-wrapper select {
+      border: 1px solid #475569;
+      background: #0f172a;
+      color: #f8fafc;
+      border-radius: 6px;
+      padding: 7px 14px;
+      font-size: 13px;
+      font-weight: 600;
+      outline: none;
+      cursor: pointer;
+    }
+    .swagger-ui .topbar .download-url-wrapper .download-url-button {
+      background: #d97706;
+      border-radius: 6px;
+      font-weight: 600;
+    }
+    .swagger-ui .topbar a {
+      display: none !important; /* Hide default swagger logo */
+    }
+    .swagger-ui .info {
+      margin: 28px 0;
+    }
+    .swagger-ui .scheme-container {
+      background: #ffffff;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+      border-radius: 10px;
+      padding: 18px;
+      margin-bottom: 24px;
+    }
+  </style>
+</head>
+<body>
+  <header class="hanjo-topbar">
+    <div class="hanjo-topbar-brand">
+      <span class="hanjo-logo">☕</span>
+      <span>Hanjo ERP & POS Backend</span>
+      <span class="hanjo-topbar-badge">v1.0.0</span>
+    </div>
+    <nav class="hanjo-topbar-nav">
+      <a href="/docs/specs/backoffice.yaml" target="_blank">Back-Office YAML</a>
+      <a href="/docs/specs/pos.yaml" target="_blank">POS Tablet YAML</a>
+      <a href="/docs/swagger.yaml" target="_blank">Master YAML</a>
+      <a href="/health" target="_blank">Health Check</a>
+    </nav>
+  </header>
+
+  <div id="swagger-ui"></div>
+
+  <script src="https://unpkg.com/swagger-ui-dist@5.18.2/swagger-ui-bundle.js" charset="UTF-8"></script>
+  <script src="https://unpkg.com/swagger-ui-dist@5.18.2/swagger-ui-standalone-preset.js" charset="UTF-8"></script>
+  <script>
+    window.onload = function() {
+      const ui = SwaggerUIBundle({
+        urls: [
+          { url: "/docs/specs/backoffice.yaml", name: "🖥️ Back-Office API (Web Dashboard / HQ)" },
+          { url: "/docs/specs/pos.yaml", name: "📱 Point of Sale (POS) API (Tablet Kasir & Barista)" },
+          { url: "/docs/swagger.yaml", name: "🌟 Master Gateway & Overview" },
+          { url: "/docs/modules/user.yaml", name: "👥 Module: User Management" },
+          { url: "/docs/modules/auth.yaml", name: "🔐 Module: Authentication & Session" },
+          { url: "/docs/modules/organization.yaml", name: "🏢 Module: Multi-Tenancy (3-Tier)" }
+        ],
+        "urls.primaryName": "🖥️ Back-Office API (Web Dashboard / HQ)",
+        dom_id: '#swagger-ui',
+        deepLinking: true,
+        persistAuthorization: true,
+        filter: true,
+        displayRequestDuration: true,
+        tryItOutEnabled: true,
+        presets: [
+          SwaggerUIBundle.presets.apis,
+          SwaggerUIStandalonePreset
+        ],
+        plugins: [
+          SwaggerUIBundle.plugins.DownloadUrl
+        ],
+        layout: "StandaloneLayout"
+      });
+      window.ui = ui;
+    };
+  </script>
+</body>
+</html>
