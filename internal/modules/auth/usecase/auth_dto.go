@@ -20,8 +20,8 @@ type POSLoginInput struct {
 type UserOutput struct {
 	ID             string  `json:"id"`
 	OrganizationID string  `json:"organization_id"`
-	BrandID        *string `json:"brand_id,omitempty"`
-	OutletID       *string `json:"outlet_id,omitempty"`
+	BrandID        *string `json:"brand_id"`
+	OutletID       *string `json:"outlet_id"`
 	Username       string  `json:"username"`
 	Email          string  `json:"email"`
 	Status         string  `json:"status"`
@@ -35,11 +35,25 @@ type AuthOutput struct {
 type UserProfileOutput struct {
 	ID             string     `json:"id"`
 	OrganizationID string     `json:"organization_id"`
-	BrandID        *string    `json:"brand_id,omitempty"`
-	OutletID       *string    `json:"outlet_id,omitempty"`
+	BrandID        *string    `json:"brand_id"`
+	OutletID       *string    `json:"outlet_id"`
 	Username       string     `json:"username"`
 	Email          string     `json:"email"`
 	Status         string     `json:"status"`
 	CreatedAt      time.Time  `json:"created_at"`
 	UpdatedAt      time.Time  `json:"updated_at"`
+}
+
+// ChangePasswordInput carries parameters for self-service password update.
+type ChangePasswordInput struct {
+	UserID          string
+	CurrentPassword string
+	NewPassword     string
+}
+
+// ChangePINInput carries parameters for self-service POS PIN update.
+type ChangePINInput struct {
+	UserID     string
+	CurrentPIN *string
+	NewPIN     string
 }

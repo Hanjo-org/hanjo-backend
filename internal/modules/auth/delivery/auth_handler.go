@@ -48,6 +48,8 @@ func RegisterAuthRoutes(
 	protected := authGroup.Group("", middleware.Auth(jwtManager))
 	protected.Post("/logout", h.Logout)
 	protected.Get("/me", h.Me)
+	protected.Put("/me/password", h.ChangePassword)
+	protected.Put("/me/pin", h.ChangePIN)
 
 	return h
 }
@@ -145,6 +147,62 @@ func (h *AuthHandler) Me(c fiber.Ctx) error {
 	return response.Success(c, fiber.StatusOK, "profil berhasil diambil", profile)
 }
 
+// ChangePassword handles self-service password updates for the authenticated user.
+func (h *AuthHandler) ChangePassword(c fiber.Ctx) error {
+	userID := contextutil.MustGetUserID(c)
+	if userID == "" {
+		return response.Fail(c, fiber.StatusUnauthorized, "AUTH_UNAUTHORIZED", "pengguna tidak terautentikasi")
+	}
+
+	var req ChangePasswordRequest
+	if err := c.Bind().Body(&req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "INVALID_BODY", "format request body tidak valid")
+	}
+
+	if ok, err := response.ValidateOrFail(c, req); !ok {
+		return err
+	}
+
+	err := h.uc.ChangePassword(c.Context(), usecase.ChangePasswordInput{
+		UserID:          userID,
+		CurrentPassword: req.CurrentPassword,
+		NewPassword:     req.NewPassword,
+	})
+	if err != nil {
+		return h.mapAuthError(c, err)
+	}
+
+	return response.Success(c, fiber.StatusOK, "password berhasil diperbarui", nil)
+}
+
+// ChangePIN handles self-service POS PIN updates or initial configuration for the authenticated user.
+func (h *AuthHandler) ChangePIN(c fiber.Ctx) error {
+	userID := contextutil.MustGetUserID(c)
+	if userID == "" {
+		return response.Fail(c, fiber.StatusUnauthorized, "AUTH_UNAUTHORIZED", "pengguna tidak terautentikasi")
+	}
+
+	var req ChangePINRequest
+	if err := c.Bind().Body(&req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "INVALID_BODY", "format request body tidak valid")
+	}
+
+	if ok, err := response.ValidateOrFail(c, req); !ok {
+		return err
+	}
+
+	err := h.uc.ChangePIN(c.Context(), usecase.ChangePINInput{
+		UserID:     userID,
+		CurrentPIN: req.CurrentPIN,
+		NewPIN:     req.NewPIN,
+	})
+	if err != nil {
+		return h.mapAuthError(c, err)
+	}
+
+	return response.Success(c, fiber.StatusOK, "PIN berhasil diperbarui", nil)
+}
+
 func (h *AuthHandler) setRefreshTokenCookie(c fiber.Ctx, token string) {
 	if token == "" {
 		return
@@ -174,6 +232,20 @@ func (h *AuthHandler) mapAuthError(c fiber.Ctx, err error) error {
 		return response.Fail(c, fiber.StatusUnauthorized, "AUTH_TOKEN_EXPIRED", "sesi login telah kedaluwarsa")
 	case errors.Is(err, authdomain.ErrInvalidToken):
 		return response.Fail(c, fiber.StatusUnauthorized, "AUTH_INVALID_TOKEN", "token autentikasi tidak valid")
+	case errors.Is(err, authdomain.ErrCurrentPasswordMismatch):
+		return response.Fail(c, fiber.StatusBadRequest, "AUTH_INVALID_CURRENT_PASSWORD", "password saat ini tidak sesuai")
+	case errors.Is(err, authdomain.ErrCurrentPINMismatch):
+		return response.Fail(c, fiber.StatusBadRequest, "AUTH_INVALID_CURRENT_PIN", "PIN saat ini tidak sesuai")
+	case errors.Is(err, authdomain.ErrCurrentPINRequired):
+		return response.Fail(c, fiber.StatusBadRequest, "AUTH_CURRENT_PIN_REQUIRED", "PIN saat ini wajib diisi")
+	case errors.Is(err, authdomain.ErrSamePassword):
+		return response.Fail(c, fiber.StatusUnprocessableEntity, "AUTH_SAME_PASSWORD", "password baru tidak boleh sama dengan password saat ini")
+	case errors.Is(err, authdomain.ErrSamePIN):
+		return response.Fail(c, fiber.StatusUnprocessableEntity, "AUTH_SAME_PIN", "PIN baru tidak boleh sama dengan PIN saat ini")
+	case errors.Is(err, authdomain.ErrTooManyAttempts):
+		return response.Fail(c, fiber.StatusTooManyRequests, "AUTH_TOO_MANY_ATTEMPTS", "terlalu banyak percobaan login gagal, akun terkunci sementara selama 15 menit")
+	case errors.Is(err, userdomain.ErrUserNotFound):
+		return response.Fail(c, fiber.StatusNotFound, "USER_NOT_FOUND", "pengguna tidak ditemukan")
 	default:
 		return response.Fail(c, fiber.StatusInternalServerError, "INTERNAL_ERROR", "terjadi kesalahan internal pada server")
 	}

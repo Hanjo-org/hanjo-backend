@@ -15,7 +15,9 @@ import (
 	authdelivery "github.com/hanjo-erp/hanjo/internal/modules/auth/delivery"
 	authusecase "github.com/hanjo-erp/hanjo/internal/modules/auth/usecase"
 	orginfra "github.com/hanjo-erp/hanjo/internal/modules/organization/infrastructure"
+	userdelivery "github.com/hanjo-erp/hanjo/internal/modules/user/delivery"
 	userinfra "github.com/hanjo-erp/hanjo/internal/modules/user/infrastructure"
+	userusecase "github.com/hanjo-erp/hanjo/internal/modules/user/usecase"
 	"github.com/hanjo-erp/hanjo/pkg/jwt"
 	"github.com/hanjo-erp/hanjo/pkg/limiter"
 	"github.com/hanjo-erp/hanjo/pkg/response"
@@ -59,6 +61,14 @@ func SetupApp(cfg *config.Config, db *gorm.DB, log *zap.Logger) *fiber.App {
 		c.Set(fiber.HeaderContentType, "application/yaml")
 		return c.Send(content)
 	})
+	app.Get("/docs/specs/:name", func(c fiber.Ctx) error {
+		content, err := docs.FS.ReadFile("specs/" + c.Params("name"))
+		if err != nil {
+			return c.Status(fiber.StatusNotFound).SendString("client specification not found")
+		}
+		c.Set(fiber.HeaderContentType, "application/yaml")
+		return c.Send(content)
+	})
 	app.Get("/docs/modules/:name", func(c fiber.Ctx) error {
 		content, err := docs.FS.ReadFile("modules/" + c.Params("name"))
 		if err != nil {
@@ -86,21 +96,22 @@ func SetupApp(cfg *config.Config, db *gorm.DB, log *zap.Logger) *fiber.App {
 	jwtManager := initJWTManager(cfg, log)
 
 	// In-memory rate limiter for brute-force protection
-	_ = limiter.NewMemoryRateLimiter()
+	rateLimiter := limiter.NewMemoryRateLimiter()
 
 	// Base API route group
 	v1 := app.Group("/api/v1")
 
 	// Repositories
 	userRepo := userinfra.NewUserRepository(db)
-	_ = orginfra.NewOrganizationRepository(db)
-	_ = orginfra.NewBrandRepository(db)
-	_ = orginfra.NewOutletRepository(db)
+	orgRepo := orginfra.NewOrganizationRepository(db)
+	brandRepo := orginfra.NewBrandRepository(db)
+	outletRepo := orginfra.NewOutletRepository(db)
 
 	// Auth Module
 	authUC := authusecase.NewAuthUsecase(
 		userRepo,
 		jwtManager,
+		rateLimiter,
 		cfg.JWTExpiration,
 		cfg.JWTRefreshExpiration,
 		log,
@@ -111,6 +122,20 @@ func SetupApp(cfg *config.Config, db *gorm.DB, log *zap.Logger) *fiber.App {
 		jwtManager,
 		cfg.RefreshTokenCookieName,
 		cfg.AppEnv == "production",
+	)
+
+	// User Module (Cross-Module Injected Repositories, No Cross-Module GORM Preload)
+	userUC := userusecase.NewUserUsecase(
+		userRepo,
+		orgRepo,
+		brandRepo,
+		outletRepo,
+		log,
+	)
+	userdelivery.RegisterUserRoutes(
+		v1,
+		userUC,
+		jwtManager,
 	)
 
 	return app

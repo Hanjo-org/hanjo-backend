@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -20,10 +21,12 @@ import (
 )
 
 type mockAuthUsecase struct {
-	loginFn        func(ctx context.Context, input usecase.LoginInput) (*usecase.AuthOutput, error)
-	posLoginFn     func(ctx context.Context, input usecase.POSLoginInput) (*usecase.AuthOutput, error)
-	refreshTokenFn func(ctx context.Context, refreshTokenString string) (*authdomain.TokenPair, error)
-	meFn           func(ctx context.Context, userID string) (*usecase.UserProfileOutput, error)
+	loginFn          func(ctx context.Context, input usecase.LoginInput) (*usecase.AuthOutput, error)
+	posLoginFn       func(ctx context.Context, input usecase.POSLoginInput) (*usecase.AuthOutput, error)
+	refreshTokenFn   func(ctx context.Context, refreshTokenString string) (*authdomain.TokenPair, error)
+	meFn             func(ctx context.Context, userID string) (*usecase.UserProfileOutput, error)
+	changePasswordFn func(ctx context.Context, input usecase.ChangePasswordInput) error
+	changePINFn      func(ctx context.Context, input usecase.ChangePINInput) error
 }
 
 func (m *mockAuthUsecase) Login(ctx context.Context, input usecase.LoginInput) (*usecase.AuthOutput, error) {
@@ -52,6 +55,20 @@ func (m *mockAuthUsecase) Me(ctx context.Context, userID string) (*usecase.UserP
 		return m.meFn(ctx, userID)
 	}
 	return nil, nil
+}
+
+func (m *mockAuthUsecase) ChangePassword(ctx context.Context, input usecase.ChangePasswordInput) error {
+	if m.changePasswordFn != nil {
+		return m.changePasswordFn(ctx, input)
+	}
+	return nil
+}
+
+func (m *mockAuthUsecase) ChangePIN(ctx context.Context, input usecase.ChangePINInput) error {
+	if m.changePINFn != nil {
+		return m.changePINFn(ctx, input)
+	}
+	return nil
 }
 
 func setupTestApp(t *testing.T, uc usecase.AuthUsecase) (*fiber.App, *jwt.Manager) {
@@ -134,6 +151,27 @@ func TestAuthHandler_Login(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 	})
+
+	t.Run("Too Many Attempts: 429 Status", func(t *testing.T) {
+		lockedUc := &mockAuthUsecase{
+			loginFn: func(ctx context.Context, input usecase.LoginInput) (*usecase.AuthOutput, error) {
+				return nil, authdomain.ErrTooManyAttempts
+			},
+		}
+		lockedApp, _ := setupTestApp(t, lockedUc)
+
+		body, _ := json.Marshal(map[string]string{
+			"identifier": "locked@example.com",
+			"password":   "AnyPassword123!",
+		})
+
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := lockedApp.Test(req)
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusTooManyRequests, resp.StatusCode)
+	})
 }
 
 func TestAuthHandler_POSLogin(t *testing.T) {
@@ -188,6 +226,28 @@ func TestAuthHandler_POSLogin(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusUnprocessableEntity, resp.StatusCode)
 	})
+
+	t.Run("Too Many Attempts: 429 Status", func(t *testing.T) {
+		lockedUc := &mockAuthUsecase{
+			posLoginFn: func(ctx context.Context, input usecase.POSLoginInput) (*usecase.AuthOutput, error) {
+				return nil, authdomain.ErrTooManyAttempts
+			},
+		}
+		lockedApp, _ := setupTestApp(t, lockedUc)
+
+		body, _ := json.Marshal(map[string]string{
+			"outlet_id": "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
+			"username":  "kasir_locked",
+			"pin":       "123456",
+		})
+
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/pos/login", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := lockedApp.Test(req)
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusTooManyRequests, resp.StatusCode)
+	})
 }
 
 func TestAuthHandler_ProtectedRoutes(t *testing.T) {
@@ -236,5 +296,93 @@ func TestAuthHandler_ProtectedRoutes(t *testing.T) {
 		resp, err := app.Test(req)
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
+	})
+
+	t.Run("ChangePassword: Success", func(t *testing.T) {
+		uc.changePasswordFn = func(ctx context.Context, input usecase.ChangePasswordInput) error {
+			assert.Equal(t, "user-1", input.UserID)
+			assert.Equal(t, "CurrentSecret123", input.CurrentPassword)
+			assert.Equal(t, "NewSecret456", input.NewPassword)
+			return nil
+		}
+
+		body := `{"current_password":"CurrentSecret123","new_password":"NewSecret456"}`
+		req := httptest.NewRequest(http.MethodPut, "/api/v1/auth/me/password", strings.NewReader(body))
+		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := app.Test(req)
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+	})
+
+	t.Run("ChangePassword: Current Password Mismatch", func(t *testing.T) {
+		uc.changePasswordFn = func(ctx context.Context, input usecase.ChangePasswordInput) error {
+			return authdomain.ErrCurrentPasswordMismatch
+		}
+
+		body := `{"current_password":"WrongSecret123","new_password":"NewSecret456"}`
+		req := httptest.NewRequest(http.MethodPut, "/api/v1/auth/me/password", strings.NewReader(body))
+		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := app.Test(req)
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	})
+
+	t.Run("ChangePassword: Validation Error when new password too short", func(t *testing.T) {
+		body := `{"current_password":"CurrentSecret123","new_password":"short"}`
+		req := httptest.NewRequest(http.MethodPut, "/api/v1/auth/me/password", strings.NewReader(body))
+		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := app.Test(req)
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusUnprocessableEntity, resp.StatusCode)
+	})
+
+	t.Run("ChangePIN: Success", func(t *testing.T) {
+		uc.changePINFn = func(ctx context.Context, input usecase.ChangePINInput) error {
+			assert.Equal(t, "user-1", input.UserID)
+			assert.Equal(t, "123456", *input.CurrentPIN)
+			assert.Equal(t, "654321", input.NewPIN)
+			return nil
+		}
+
+		body := `{"current_pin":"123456","new_pin":"654321"}`
+		req := httptest.NewRequest(http.MethodPut, "/api/v1/auth/me/pin", strings.NewReader(body))
+		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := app.Test(req)
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+	})
+
+	t.Run("ChangePIN: Current PIN Mismatch", func(t *testing.T) {
+		uc.changePINFn = func(ctx context.Context, input usecase.ChangePINInput) error {
+			return authdomain.ErrCurrentPINMismatch
+		}
+
+		body := `{"current_pin":"000000","new_pin":"654321"}`
+		req := httptest.NewRequest(http.MethodPut, "/api/v1/auth/me/pin", strings.NewReader(body))
+		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := app.Test(req)
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	})
+
+	t.Run("ChangePIN: Validation Error when PIN non-numeric", func(t *testing.T) {
+		body := `{"new_pin":"abcdef"}`
+		req := httptest.NewRequest(http.MethodPut, "/api/v1/auth/me/pin", strings.NewReader(body))
+		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := app.Test(req)
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusUnprocessableEntity, resp.StatusCode)
 	})
 }

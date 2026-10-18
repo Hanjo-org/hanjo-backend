@@ -56,6 +56,10 @@ type Config struct {
 
 	RefreshTokenCookieName string `mapstructure:"REFRESH_TOKEN_COOKIE_NAME"`
 
+	// Rate Limiting & Brute Force Protection
+	AuthMaxLoginAttempts int           `mapstructure:"AUTH_MAX_LOGIN_ATTEMPTS"`
+	AuthLockoutDuration  time.Duration `mapstructure:"AUTH_LOCKOUT_DURATION"`
+
 	// CORS
 	CORSAllowedOrigins []string `mapstructure:"CORS_ALLOWED_ORIGINS"`
 }
@@ -141,6 +145,8 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("JWT_REFRESH_EXPIRATION", "168h")
 
 	v.SetDefault("REFRESH_TOKEN_COOKIE_NAME", "refresh_token")
+	v.SetDefault("AUTH_MAX_LOGIN_ATTEMPTS", 5)
+	v.SetDefault("AUTH_LOCKOUT_DURATION", "15m")
 }
 
 func parseCommaList(s string) []string {
