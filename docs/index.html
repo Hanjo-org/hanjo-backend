@@ -110,6 +110,60 @@
       padding: 18px;
       margin-bottom: 24px;
     }
+
+    /* Enhanced Markdown Tables for Request/Response Schemas */
+    .swagger-ui .renderedMarkdown table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 14px 0 20px 0;
+      font-size: 13px;
+      background: #ffffff;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+      border: 1px solid #e2e8f0;
+    }
+    .swagger-ui .renderedMarkdown th {
+      background: #f1f5f9;
+      color: #0f172a;
+      font-weight: 700;
+      text-align: left;
+      padding: 10px 14px;
+      border-bottom: 2px solid #cbd5e1;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .swagger-ui .renderedMarkdown td {
+      padding: 10px 14px;
+      border-bottom: 1px solid #f1f5f9;
+      color: #334155;
+      vertical-align: middle;
+      line-height: 1.5;
+    }
+    .swagger-ui .renderedMarkdown tr:last-child td {
+      border-bottom: none;
+    }
+    .swagger-ui .renderedMarkdown tr:hover td {
+      background: #f8fafc;
+    }
+    .swagger-ui .renderedMarkdown code {
+      background: #f8fafc;
+      color: #0f172a;
+      padding: 3px 6px;
+      border-radius: 5px;
+      font-size: 12px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      border: 1px solid #e2e8f0;
+      font-weight: 600;
+    }
+    .swagger-ui .renderedMarkdown strong {
+      color: #dc2626; /* Highlight required */
+    }
+    .swagger-ui .renderedMarkdown em {
+      color: #64748b;
+      font-style: normal;
+    }
   </style>
 </head>
 <body>
@@ -139,6 +193,7 @@
           { url: "/docs/specs/pos.yaml", name: "📱 Point of Sale (POS) API (Tablet Kasir & Barista)" },
           { url: "/docs/swagger.yaml", name: "🌟 Master Gateway & Overview" },
           { url: "/docs/modules/user.yaml", name: "👥 Module: User Management" },
+          { url: "/docs/modules/rbac.yaml", name: "🛡️ Module: Access Control & RBAC" },
           { url: "/docs/modules/auth.yaml", name: "🔐 Module: Authentication & Session" },
           { url: "/docs/modules/organization.yaml", name: "🏢 Module: Multi-Tenancy (3-Tier)" }
         ],
@@ -149,6 +204,10 @@
         filter: true,
         displayRequestDuration: true,
         tryItOutEnabled: true,
+        defaultModelExpandDepth: 3,
+        defaultModelsExpandDepth: 3,
+        showExtensions: true,
+        showCommonExtensions: true,
         presets: [
           SwaggerUIBundle.presets.apis,
           SwaggerUIStandalonePreset

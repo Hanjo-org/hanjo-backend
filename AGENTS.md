@@ -59,6 +59,8 @@ Whenever you are writing, refactoring, or generating code in this repository:
 - [multi-tenancy.md](.agents/rules/multi-tenancy.md): 3-Tier FnB hierarchy, tenant scoping, and brand/outlet role segregation.
 - [rbac-lookup.md](.agents/rules/rbac-lookup.md): Decoupling administrative CRUD from operational lookup endpoints, RBAC matrix, and Fiber route ordering.
 - [multi-tenant-hierarchy.md](docs/knowledge/multi-tenant-hierarchy.md): Full business background, multi-brand coffee shop use case, and architectural diagram.
+- [access-control-hybrid-model.md](docs/knowledge/access-control-hybrid-model.md): Hybrid Access Control (Scoped RBAC + Contextual Policy Guards), 3-layer security model, and FnB authorization patterns.
+- [access-control-catalog.md](docs/knowledge/access-control-catalog.md): Master catalog of all 26 permissions, 9 system roles, and full role-permission access matrix.
 - [architecture.md](.agents/rules/architecture.md): Complete guidelines for Directory Structure, Layers, Dependency Inversion, and Cross-Module Composition.
 - [naming-convention.md](.agents/rules/naming-convention.md): Rules for naming variables, structs, files, and interfaces across all layers.
 - [error-handling.md](.agents/rules/error-handling.md): Guidelines for custom sentinel errors, wrapping, and HTTP status code mapping.

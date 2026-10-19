@@ -20,6 +20,7 @@ type POSLoginInput struct {
 type UserOutput struct {
 	ID             string  `json:"id"`
 	OrganizationID string  `json:"organization_id"`
+	RoleID         *string `json:"role_id,omitempty"`
 	BrandID        *string `json:"brand_id"`
 	OutletID       *string `json:"outlet_id"`
 	Username       string  `json:"username"`
@@ -35,6 +36,7 @@ type AuthOutput struct {
 type UserProfileOutput struct {
 	ID             string     `json:"id"`
 	OrganizationID string     `json:"organization_id"`
+	RoleID         *string    `json:"role_id,omitempty"`
 	BrandID        *string    `json:"brand_id"`
 	OutletID       *string    `json:"outlet_id"`
 	Username       string     `json:"username"`

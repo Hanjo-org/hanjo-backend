@@ -17,9 +17,11 @@ const (
 	UserIDKey         contextKey = "user_id"
 	UserEmailKey      contextKey = "user_email"
 	UserRoleKey       contextKey = "user_role"
+	UserRoleIDKey     contextKey = "user_role_id"
 	OrganizationIDKey contextKey = "organization_id"
 	BrandIDKey        contextKey = "brand_id"
 	OutletIDKey       contextKey = "outlet_id"
+	SupervisorIDKey   contextKey = "supervisor_id"
 )
 
 // SetUserID sets the authenticated user ID in fiber.Ctx locals.
@@ -71,6 +73,20 @@ func GetUserRole(c fiber.Ctx) string {
 	return val
 }
 
+// SetUserRoleID sets the authenticated user role ID in fiber.Ctx locals.
+func SetUserRoleID(c fiber.Ctx, roleID string) {
+	c.Locals(string(UserRoleIDKey), roleID)
+}
+
+// GetUserRoleID retrieves the authenticated user role ID from fiber.Ctx locals.
+func GetUserRoleID(c fiber.Ctx) string {
+	val, ok := c.Locals(string(UserRoleIDKey)).(string)
+	if !ok {
+		return ""
+	}
+	return val
+}
+
 // SetOrganizationID sets the authenticated organization ID in fiber.Ctx locals.
 func SetOrganizationID(c fiber.Ctx, orgID string) {
 	c.Locals(string(OrganizationIDKey), orgID)
@@ -107,6 +123,20 @@ func SetOutletID(c fiber.Ctx, outletID string) {
 // GetOutletID retrieves the active outlet ID from fiber.Ctx locals.
 func GetOutletID(c fiber.Ctx) string {
 	val, ok := c.Locals(string(OutletIDKey)).(string)
+	if !ok {
+		return ""
+	}
+	return val
+}
+
+// SetSupervisorID sets the authorized supervisor user ID in fiber.Ctx locals.
+func SetSupervisorID(c fiber.Ctx, supervisorID string) {
+	c.Locals(string(SupervisorIDKey), supervisorID)
+}
+
+// GetSupervisorID retrieves the authorized supervisor user ID from fiber.Ctx locals.
+func GetSupervisorID(c fiber.Ctx) string {
+	val, ok := c.Locals(string(SupervisorIDKey)).(string)
 	if !ok {
 		return ""
 	}

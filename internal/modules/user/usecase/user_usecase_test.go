@@ -11,6 +11,7 @@ import (
 	"go.uber.org/zap"
 
 	orgdomain "github.com/hanjo-erp/hanjo/internal/modules/organization/domain"
+	rbacdomain "github.com/hanjo-erp/hanjo/internal/modules/rbac/domain"
 	userdomain "github.com/hanjo-erp/hanjo/internal/modules/user/domain"
 	"github.com/hanjo-erp/hanjo/internal/modules/user/usecase"
 	"github.com/hanjo-erp/hanjo/pkg/password"
@@ -268,10 +269,94 @@ func (m *mockOutletRepo) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
+type mockRoleRepo struct {
+	getByIDFn                      func(ctx context.Context, id string) (*rbacdomain.Role, error)
+	getByIDsFn                     func(ctx context.Context, ids []string) ([]*rbacdomain.Role, error)
+	getByCodeFn                    func(ctx context.Context, orgID *string, code string) (*rbacdomain.Role, error)
+	listFn                         func(ctx context.Context, filter rbacdomain.RoleFilter, params response.PaginationParams) ([]*rbacdomain.Role, int64, error)
+	getLookupFn                    func(ctx context.Context, orgID string, tier *rbacdomain.RoleTier, params response.PaginationParams) ([]*rbacdomain.RoleLookup, int64, error)
+	createFn                       func(ctx context.Context, role *rbacdomain.Role, permissionIDs []string) error
+	updateFn                       func(ctx context.Context, role *rbacdomain.Role, permissionIDs []string) error
+	deleteFn                       func(ctx context.Context, id string) error
+	getAllRolePermissionsMappingFn func(ctx context.Context) (map[string][]string, error)
+	getAllRoleCodesFn              func(ctx context.Context) (map[string]string, error)
+}
+
+func (m *mockRoleRepo) GetByID(ctx context.Context, id string) (*rbacdomain.Role, error) {
+	if m.getByIDFn != nil {
+		return m.getByIDFn(ctx, id)
+	}
+	return nil, rbacdomain.ErrRoleNotFound
+}
+
+func (m *mockRoleRepo) GetByIDs(ctx context.Context, ids []string) ([]*rbacdomain.Role, error) {
+	if m.getByIDsFn != nil {
+		return m.getByIDsFn(ctx, ids)
+	}
+	return nil, nil
+}
+
+func (m *mockRoleRepo) GetByCode(ctx context.Context, orgID *string, code string) (*rbacdomain.Role, error) {
+	if m.getByCodeFn != nil {
+		return m.getByCodeFn(ctx, orgID, code)
+	}
+	return nil, rbacdomain.ErrRoleNotFound
+}
+
+func (m *mockRoleRepo) List(ctx context.Context, filter rbacdomain.RoleFilter, params response.PaginationParams) ([]*rbacdomain.Role, int64, error) {
+	if m.listFn != nil {
+		return m.listFn(ctx, filter, params)
+	}
+	return nil, 0, nil
+}
+
+func (m *mockRoleRepo) GetLookup(ctx context.Context, orgID string, tier *rbacdomain.RoleTier, params response.PaginationParams) ([]*rbacdomain.RoleLookup, int64, error) {
+	if m.getLookupFn != nil {
+		return m.getLookupFn(ctx, orgID, tier, params)
+	}
+	return nil, 0, nil
+}
+
+func (m *mockRoleRepo) Create(ctx context.Context, role *rbacdomain.Role, permissionIDs []string) error {
+	if m.createFn != nil {
+		return m.createFn(ctx, role, permissionIDs)
+	}
+	return nil
+}
+
+func (m *mockRoleRepo) Update(ctx context.Context, role *rbacdomain.Role, permissionIDs []string) error {
+	if m.updateFn != nil {
+		return m.updateFn(ctx, role, permissionIDs)
+	}
+	return nil
+}
+
+func (m *mockRoleRepo) Delete(ctx context.Context, id string) error {
+	if m.deleteFn != nil {
+		return m.deleteFn(ctx, id)
+	}
+	return nil
+}
+
+func (m *mockRoleRepo) GetAllRolePermissionsMapping(ctx context.Context) (map[string][]string, error) {
+	if m.getAllRolePermissionsMappingFn != nil {
+		return m.getAllRolePermissionsMappingFn(ctx)
+	}
+	return nil, nil
+}
+
+func (m *mockRoleRepo) GetAllRoleCodes(ctx context.Context) (map[string]string, error) {
+	if m.getAllRoleCodesFn != nil {
+		return m.getAllRoleCodesFn(ctx)
+	}
+	return nil, nil
+}
+
 func TestUserUsecase_List(t *testing.T) {
 	orgID := uuid.NewString()
 	brandID := uuid.NewString()
 	outletID := uuid.NewString()
+	roleID := uuid.NewString()
 
 	users := []*userdomain.User{
 		{
@@ -279,6 +364,7 @@ func TestUserUsecase_List(t *testing.T) {
 			OrganizationID: orgID,
 			BrandID:        &brandID,
 			OutletID:       &outletID,
+			RoleID:         &roleID,
 			Username:       "kasir1",
 			Email:          "kasir1@harmoni.id",
 			Status:         "ACTIVE",
@@ -325,7 +411,16 @@ func TestUserUsecase_List(t *testing.T) {
 		},
 	}
 
-	uc := usecase.NewUserUsecase(userRepo, orgRepo, brandRepo, outletRepo, zap.NewNop())
+	roleRepo := &mockRoleRepo{
+		getByIDsFn: func(ctx context.Context, ids []string) ([]*rbacdomain.Role, error) {
+			assert.Contains(t, ids, roleID)
+			return []*rbacdomain.Role{
+				{ID: roleID, Code: "CASHIER", Name: "Kasir", Tier: rbacdomain.RoleTierOutlet},
+			}, nil
+		},
+	}
+
+	uc := usecase.NewUserUsecase(userRepo, orgRepo, brandRepo, outletRepo, roleRepo, zap.NewNop())
 	res, total, err := uc.List(context.Background(), userdomain.UserFilter{OrganizationID: orgID}, response.PaginationParams{Page: 1, PerPage: 10})
 
 	require.NoError(t, err)
@@ -336,10 +431,13 @@ func TestUserUsecase_List(t *testing.T) {
 	assert.Equal(t, "PT Harmoni", res[0].Organization.Name)
 	assert.Equal(t, "Daily Coffee", res[0].Brand.Name)
 	assert.Equal(t, "Kemang", res[0].Outlet.Name)
+	assert.NotNil(t, res[0].Role)
+	assert.Equal(t, "CASHIER", res[0].Role.Code)
 
 	assert.Equal(t, "PT Harmoni", res[1].Organization.Name)
 	assert.Nil(t, res[1].Brand)
 	assert.Nil(t, res[1].Outlet)
+	assert.Nil(t, res[1].Role)
 }
 
 func TestUserUsecase_Create(t *testing.T) {
@@ -380,7 +478,7 @@ func TestUserUsecase_Create(t *testing.T) {
 			},
 		}
 
-		uc := usecase.NewUserUsecase(userRepo, orgRepo, brandRepo, outletRepo, zap.NewNop())
+		uc := usecase.NewUserUsecase(userRepo, orgRepo, brandRepo, outletRepo, &mockRoleRepo{}, zap.NewNop())
 		input := usecase.CreateUserInput{
 			OrganizationID: orgID,
 			BrandID:        &brandID,
@@ -417,7 +515,7 @@ func TestUserUsecase_Create(t *testing.T) {
 			},
 		}
 
-		uc := usecase.NewUserUsecase(userRepo, orgRepo, &mockBrandRepo{}, &mockOutletRepo{}, zap.NewNop())
+		uc := usecase.NewUserUsecase(userRepo, orgRepo, &mockBrandRepo{}, &mockOutletRepo{}, &mockRoleRepo{}, zap.NewNop())
 		_, err := uc.Create(context.Background(), usecase.CreateUserInput{
 			OrganizationID: orgID,
 			Username:       "newuser",
@@ -442,7 +540,7 @@ func TestUserUsecase_Create(t *testing.T) {
 			},
 		}
 
-		uc := usecase.NewUserUsecase(userRepo, orgRepo, brandRepo, &mockOutletRepo{}, zap.NewNop())
+		uc := usecase.NewUserUsecase(userRepo, orgRepo, brandRepo, &mockOutletRepo{}, &mockRoleRepo{}, zap.NewNop())
 		_, err := uc.Create(context.Background(), usecase.CreateUserInput{
 			OrganizationID: orgID,
 			BrandID:        &brandID,
@@ -452,6 +550,72 @@ func TestUserUsecase_Create(t *testing.T) {
 		})
 
 		assert.ErrorIs(t, err, userdomain.ErrInvalidHierarchy)
+	})
+
+	t.Run("reject assigning DEVELOPER role", func(t *testing.T) {
+		devRoleID := uuid.NewString()
+		userRepo := &mockUserRepo{
+			getByEmailFn: func(ctx context.Context, email string) (*userdomain.User, error) {
+				return nil, userdomain.ErrUserNotFound
+			},
+			getByUsernameFn: func(ctx context.Context, orgID, username string) (*userdomain.User, error) {
+				return nil, userdomain.ErrUserNotFound
+			},
+		}
+		orgRepo := &mockOrgRepo{
+			getByIDFn: func(ctx context.Context, id string) (*orgdomain.Organization, error) {
+				return &orgdomain.Organization{ID: orgID}, nil
+			},
+		}
+		roleRepo := &mockRoleRepo{
+			getByIDFn: func(ctx context.Context, id string) (*rbacdomain.Role, error) {
+				return &rbacdomain.Role{ID: devRoleID, Code: "DEVELOPER"}, nil
+			},
+		}
+
+		uc := usecase.NewUserUsecase(userRepo, orgRepo, &mockBrandRepo{}, &mockOutletRepo{}, roleRepo, zap.NewNop())
+		_, err := uc.Create(context.Background(), usecase.CreateUserInput{
+			OrganizationID: orgID,
+			RoleID:         &devRoleID,
+			Username:       "newdev",
+			Email:          "dev@harmoni.id",
+			Password:       "Password123!",
+		})
+
+		assert.ErrorIs(t, err, rbacdomain.ErrDeveloperRoleProtected)
+	})
+
+	t.Run("role not found returns ErrRoleNotFound", func(t *testing.T) {
+		invalidRoleID := uuid.NewString()
+		userRepo := &mockUserRepo{
+			getByEmailFn: func(ctx context.Context, email string) (*userdomain.User, error) {
+				return nil, userdomain.ErrUserNotFound
+			},
+			getByUsernameFn: func(ctx context.Context, orgID, username string) (*userdomain.User, error) {
+				return nil, userdomain.ErrUserNotFound
+			},
+		}
+		orgRepo := &mockOrgRepo{
+			getByIDFn: func(ctx context.Context, id string) (*orgdomain.Organization, error) {
+				return &orgdomain.Organization{ID: orgID}, nil
+			},
+		}
+		roleRepo := &mockRoleRepo{
+			getByIDFn: func(ctx context.Context, id string) (*rbacdomain.Role, error) {
+				return nil, rbacdomain.ErrRoleNotFound
+			},
+		}
+
+		uc := usecase.NewUserUsecase(userRepo, orgRepo, &mockBrandRepo{}, &mockOutletRepo{}, roleRepo, zap.NewNop())
+		_, err := uc.Create(context.Background(), usecase.CreateUserInput{
+			OrganizationID: orgID,
+			RoleID:         &invalidRoleID,
+			Username:       "user1",
+			Email:          "user1@harmoni.id",
+			Password:       "Password123!",
+		})
+
+		assert.ErrorIs(t, err, rbacdomain.ErrRoleNotFound)
 	})
 }
 
@@ -477,7 +641,7 @@ func TestUserUsecase_GetByID(t *testing.T) {
 			},
 		}
 
-		uc := usecase.NewUserUsecase(userRepo, orgRepo, &mockBrandRepo{}, &mockOutletRepo{}, zap.NewNop())
+		uc := usecase.NewUserUsecase(userRepo, orgRepo, &mockBrandRepo{}, &mockOutletRepo{}, &mockRoleRepo{}, zap.NewNop())
 		res, err := uc.GetByID(context.Background(), orgID, userID)
 
 		require.NoError(t, err)
@@ -497,7 +661,7 @@ func TestUserUsecase_GetByID(t *testing.T) {
 			},
 		}
 
-		uc := usecase.NewUserUsecase(userRepo, &mockOrgRepo{}, &mockBrandRepo{}, &mockOutletRepo{}, zap.NewNop())
+		uc := usecase.NewUserUsecase(userRepo, &mockOrgRepo{}, &mockBrandRepo{}, &mockOutletRepo{}, &mockRoleRepo{}, zap.NewNop())
 		_, err := uc.GetByID(context.Background(), orgID, userID)
 
 		assert.ErrorIs(t, err, userdomain.ErrUserNotFound)
@@ -520,7 +684,7 @@ func TestUserUsecase_Delete(t *testing.T) {
 			},
 		}
 
-		uc := usecase.NewUserUsecase(userRepo, &mockOrgRepo{}, &mockBrandRepo{}, &mockOutletRepo{}, zap.NewNop())
+		uc := usecase.NewUserUsecase(userRepo, &mockOrgRepo{}, &mockBrandRepo{}, &mockOutletRepo{}, &mockRoleRepo{}, zap.NewNop())
 		err := uc.Delete(context.Background(), orgID, userID)
 
 		require.NoError(t, err)
@@ -535,7 +699,7 @@ func TestUserUsecase_Delete(t *testing.T) {
 			},
 		}
 
-		uc := usecase.NewUserUsecase(userRepo, &mockOrgRepo{}, &mockBrandRepo{}, &mockOutletRepo{}, zap.NewNop())
+		uc := usecase.NewUserUsecase(userRepo, &mockOrgRepo{}, &mockBrandRepo{}, &mockOutletRepo{}, &mockRoleRepo{}, zap.NewNop())
 		err := uc.Delete(context.Background(), orgID, userID)
 
 		assert.ErrorIs(t, err, userdomain.ErrUserNotFound)
@@ -561,7 +725,7 @@ func TestUserUsecase_GetLookup(t *testing.T) {
 		},
 	}
 
-	uc := usecase.NewUserUsecase(userRepo, &mockOrgRepo{}, &mockBrandRepo{}, &mockOutletRepo{}, zap.NewNop())
+	uc := usecase.NewUserUsecase(userRepo, &mockOrgRepo{}, &mockBrandRepo{}, &mockOutletRepo{}, &mockRoleRepo{}, zap.NewNop())
 	res, total, err := uc.GetLookup(context.Background(), userdomain.UserFilter{
 		OrganizationID: orgID,
 		OutletID:       &outletID,

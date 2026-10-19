@@ -33,6 +33,10 @@ tags:
     description: Manajemen Staf & Karyawan (CRUD, Role/Outlet Assignment, Status Toggle, Soft-Delete)
   - name: Multi-Tenancy Hierarchy
     description: Manajemen Hierarki 3-Tier (Organization Holding, Brand, dan Outlet Fisik)
+  - name: Role Management
+    description: Pengelolaan Peran (List, Detail, Pembuatan Custom Role, Update, dan Soft-Delete)
+  - name: Access Control Lookups
+    description: Endpoint Lookup Ringkas untuk UI Dropdown & Matriks Checkbox Izin (Zero Sensitive Data Leakage)
 
 paths:
   /api/v1/auth/login:
@@ -40,7 +44,14 @@ paths:
       tags:
         - Auth & Session
       summary: Login Web Dashboard (Email + Password)
-      description: Otentikasi pengguna back-office menggunakan email atau username dan password.
+      description: |
+        Otentikasi pengguna back-office menggunakan email atau username dan password. Mengembalikan Access Token RS256 dan menyetel HttpOnly Cookie `refresh_token`.
+
+        #### 📋 Skema Request Body:
+        | Field | Tipe Data | Status | Validasi / Aturan | Keterangan & Contoh |
+        | :--- | :--- | :--- | :--- | :--- |
+        | `identifier` | `string` | **Wajib** | String non-empty | Email akun atau username staf (`owner@harmoni.id`) |
+        | `password` | `string` | **Wajib** | Min 6 karakter | Kata sandi login akun (`Password123!`) |
       requestBody:
         required: true
         content:
@@ -72,7 +83,13 @@ paths:
       tags:
         - Auth & Session
       summary: Refresh Access Token
-      description: Memperbarui access token baru menggunakan refresh token cookie atau payload body.
+      description: |
+        Memperbarui access token baru menggunakan refresh token cookie atau payload body.
+
+        #### 📋 Skema Request Body:
+        | Field | Tipe Data | Status | Validasi / Aturan | Keterangan & Contoh |
+        | :--- | :--- | :--- | :--- | :--- |
+        | `refresh_token` | `string` | *Opsional* | JWT string valid | Token penyegar (opsional jika dikirim via HttpOnly cookie) |
       requestBody:
         required: false
         content:
@@ -145,8 +162,14 @@ paths:
       tags:
         - Auth & Session
       summary: Ganti Password Pengguna Sendiri
-      description: >-
+      description: |
         Pengguna dashboard dapat mengubah password mereka sendiri setelah memasukkan password saat ini dengan benar.
+
+        #### 📋 Skema Request Body:
+        | Field | Tipe Data | Status | Validasi / Aturan | Keterangan & Contoh |
+        | :--- | :--- | :--- | :--- | :--- |
+        | `current_password` | `string` | **Wajib** | String non-empty | Password saat ini untuk verifikasi |
+        | `new_password` | `string` | **Wajib** | Min 8 karakter | Password baru yang diinginkan |
       security:
         - BearerAuth: []
       requestBody:
@@ -180,8 +203,14 @@ paths:
       tags:
         - Auth & Session
       summary: Ganti PIN POS Sendiri
-      description: >-
+      description: |
         Mengatur atau mengubah PIN 4-8 digit untuk mesin kasir/POS tablet.
+
+        #### 📋 Skema Request Body:
+        | Field | Tipe Data | Status | Validasi / Aturan | Keterangan & Contoh |
+        | :--- | :--- | :--- | :--- | :--- |
+        | `new_pin` | `string` | **Wajib** | 4 - 8 digit numerik | PIN kasir baru yang akan disetel (`654321`) |
+        | `current_pin` | `string` | *Opsional* | 4 - 8 digit numerik | PIN saat ini (wajib jika pengguna telah memiliki PIN) |
       security:
         - BearerAuth: []
       requestBody:
@@ -329,7 +358,20 @@ paths:
       tags:
         - User Management
       summary: Tambah Staf / Pengguna Baru
-      description: Menambahkan staf, kasir, atau manajer baru. Password di-hash menggunakan Bcrypt.
+      description: |
+        Menambahkan staf, kasir, atau manajer baru. Password di-hash menggunakan Bcrypt, dan PIN kasir POS (jika diisi) di-hash secara aman.
+
+        #### 📋 Skema Request Body:
+        | Field | Tipe Data | Status | Validasi / Aturan | Keterangan & Contoh |
+        | :--- | :--- | :--- | :--- | :--- |
+        | `username` | `string` | **Wajib** | Min 3, Max 50 karakter | Username unik staf untuk login back-office (`kasir.kemang`) |
+        | `email` | `string (email)` | **Wajib** | Format email valid | Alamat email unik staf (`kasir.kemang@harmoni.id`) |
+        | `password` | `string` | **Wajib** | Min 8 karakter | Password login awal (di-hash menggunakan Bcrypt) |
+        | `role_id` | `string (uuid)` | *Opsional* | UUID v4 valid | ID peran dari `GET /api/v1/roles/lookup` untuk kontrol akses staf |
+        | `brand_id` | `string (uuid)` | *Opsional* | UUID v4 valid | ID brand FnB (wajib jika peran berlevel `BRAND` atau `OUTLET`) |
+        | `outlet_id` | `string (uuid)` | *Opsional* | UUID v4 valid | ID outlet fisik (wajib jika peran berlevel `OUTLET` / kasir) |
+        | `pin` | `string` | *Opsional* | 4 - 8 digit numerik | PIN kasir untuk login cepat di POS tablet (di-hash aman) |
+        | `status` | `string` | *Opsional* | Enum: `ACTIVE`, `INACTIVE`, `SUSPENDED` | Status keaktifan akun pengguna (default: `ACTIVE`) |
       security:
         - BearerAuth: []
       requestBody:
@@ -398,7 +440,20 @@ paths:
       tags:
         - User Management
       summary: Update Data Pengguna
-      description: Mengubah profil staf, re-assign outlet atau brand, serta update password/PIN.
+      description: |
+        Mengubah profil staf, re-assign outlet atau brand, perbarui peran (role), serta update password/PIN.
+
+        #### 📋 Skema Request Body:
+        | Field | Tipe Data | Status | Validasi / Aturan | Keterangan & Contoh |
+        | :--- | :--- | :--- | :--- | :--- |
+        | `username` | `string` | *Opsional* | Min 3, Max 50 karakter | Username baru akun jika ingin diperbarui |
+        | `email` | `string (email)` | *Opsional* | Format email valid | Email baru akun jika ingin diperbarui |
+        | `password` | `string` | *Opsional* | Min 8 karakter | Password baru (kosongkan jika tidak diganti) |
+        | `role_id` | `string (uuid)` | *Opsional* | UUID v4 valid | ID peran baru jika staf dipromosikan / dimutasi peran |
+        | `brand_id` | `string (uuid)` | *Opsional* | UUID v4 valid | ID brand baru jika staf dipindahkan ke brand lain |
+        | `outlet_id` | `string (uuid)` | *Opsional* | UUID v4 valid | ID outlet baru jika staf dipindahkan ke cabang lain |
+        | `pin` | `string` | *Opsional* | 4 - 8 digit numerik | PIN kasir POS baru (kosongkan jika tidak diganti) |
+        | `status` | `string` | *Opsional* | Enum: `ACTIVE`, `INACTIVE`, `SUSPENDED` | Status akun pengguna |
       security:
         - BearerAuth: []
       parameters:
@@ -463,7 +518,13 @@ paths:
       tags:
         - User Management
       summary: Toggle Status Pengguna
-      description: Mengubah status akun staf (ACTIVE, INACTIVE, SUSPENDED).
+      description: |
+        Mengubah status akun staf (ACTIVE, INACTIVE, SUSPENDED).
+
+        #### 📋 Skema Request Body:
+        | Field | Tipe Data | Status | Validasi / Aturan | Keterangan & Contoh |
+        | :--- | :--- | :--- | :--- | :--- |
+        | `status` | `string` | **Wajib** | Enum: `ACTIVE`, `INACTIVE`, `SUSPENDED` | Status baru akun staf (`SUSPENDED`) |
       security:
         - BearerAuth: []
       parameters:
@@ -487,6 +548,315 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UserDetailResponse'
+
+  /api/v1/roles/lookup:
+    get:
+      tags:
+        - Access Control Lookups
+      summary: Lookup Peran / Combobox Options
+      description: >-
+        Mengambil daftar peran aktif secara ringkas (`id`, `code`, `name`, `tier`) khusus untuk kebutuhan
+        dropdown / combobox pada UI formulir (misal saat menambah/menugaskan staf).
+        **Keamanan**: Peran `DEVELOPER` otomatis disembunyikan dari endpoint ini untuk mencegah eksposure akun super-admin.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: tier
+          in: query
+          description: Filter peran berdasarkan hierarki tier
+          schema:
+            type: string
+            enum: [ORGANIZATION, BRAND, OUTLET]
+        - name: page
+          in: query
+          description: Nomor halaman (default 1)
+          schema:
+            type: integer
+            default: 1
+        - name: per_page
+          in: query
+          description: Jumlah item per halaman (default 20, max 100)
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Daftar lookup peran berhasil diambil.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoleLookupResponseEnvelope'
+        '401':
+          description: Token otentikasi tidak valid atau telah kedaluwarsa.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /api/v1/permissions/lookup:
+    get:
+      tags:
+        - Access Control Lookups
+      summary: Lookup Katalog Izin (Grouped by Module)
+      description: >-
+        Mengambil master katalog seluruh 30 izin sistem yang telah dikelompokkan berdasarkan domain/modul
+        (`pos`, `catalog`, `inventory`, `order`, `table`, `report`, `finance`, `user`, `role`, `org`).
+        Sangat ideal untuk me-render antarmuka formulir matriks checkbox izin saat membuat atau mengedit Custom Role di Back-Office.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Daftar grup izin berhasil diambil.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PermissionGroupsResponseEnvelope'
+        '401':
+          description: Token otentikasi tidak valid atau kedaluwarsa.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /api/v1/roles:
+    get:
+      tags:
+        - Role Management
+      summary: Daftar Peran (Roles List)
+      description: >-
+        Mengambil daftar seluruh peran (sistem default dan custom) yang berlaku di dalam organisasi,
+        dilengkapi dengan pagination, filter status, filter hierarki tier, dan pencarian teks nama/kode peran.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: tier
+          in: query
+          description: Filter tingkatan peran
+          schema:
+            type: string
+            enum: [ORGANIZATION, BRAND, OUTLET]
+        - name: status
+          in: query
+          description: Filter status keaktifan peran
+          schema:
+            type: string
+            enum: [ACTIVE, INACTIVE]
+        - name: search
+          in: query
+          description: Pencarian nama atau kode peran
+          schema:
+            type: string
+        - name: page
+          in: query
+          description: Halaman data (default 1)
+          schema:
+            type: integer
+            default: 1
+        - name: per_page
+          in: query
+          description: Jumlah item per halaman (default 20, max 100)
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Daftar peran berhasil diambil.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoleListResponseEnvelope'
+        '401':
+          description: Tidak terotentikasi.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+    post:
+      tags:
+        - Role Management
+      summary: Buat Peran Kustom Baru (Custom Role)
+      description: |
+        Membuat definisi peran kustom baru khusus untuk organisasi pengguna yang sedang login.
+        Dapat langsung memasangkan daftar hak akses atomik (`permission_ids`).
+        **Validasi Keamanan**: Kode `DEVELOPER` dilarang digunakan (*reserved super-role*).
+
+        #### 📋 Skema Request Body:
+        | Field | Tipe Data | Status | Validasi / Aturan | Keterangan & Contoh |
+        | :--- | :--- | :--- | :--- | :--- |
+        | `code` | `string` | **Wajib** | Min 2, Max 50 karakter (A-Z, 0-9, _) | Kode unik peran berhuruf besar (`ASSISTANT_MANAGER`) |
+        | `name` | `string` | **Wajib** | Min 2, Max 100 karakter | Nama tampilan peran di formulir & antarmuka (`Asisten Manajer Cabang`) |
+        | `tier` | `string` | **Wajib** | Enum: `ORGANIZATION`, `BRAND`, `OUTLET` | Tingkatan cakupan hierarki multi-tenant peran (`OUTLET`) |
+        | `description` | `string` | *Opsional* | Max 500 karakter | Deskripsi tanggung jawab atau fungsi peran |
+        | `permission_ids` | `array[string]` | *Opsional* | Array UUID v4 valid | Daftar ID izin dari `GET /api/v1/permissions/catalog` yang diberikan |
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRoleRequest'
+      responses:
+        '201':
+          description: Peran kustom berhasil dibuat.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoleDetailResponseEnvelope'
+        '400':
+          description: Format request body atau kode peran tidak valid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Percobaan membuat peran dengan kode reserved `DEVELOPER` ditolak.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Kode peran sudah terdaftar pada organisasi ini.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '422':
+          description: Validasi field gagal.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /api/v1/roles/{id}:
+    get:
+      tags:
+        - Role Management
+      summary: Detail Peran & Izin Terkait
+      description: >-
+        Mengambil informasi lengkap satu peran berdasarkan ID UUID, mencakup metadata peran
+        beserta seluruh daftar hak akses (*granted permissions*) yang dimilikinya.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: UUID peran
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Detail peran ditemukan.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoleDetailResponseEnvelope'
+        '404':
+          description: Peran tidak ditemukan.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+    put:
+      tags:
+        - Role Management
+      summary: Perbarui Peran Kustom
+      description: |
+        Memperbarui nama, deskripsi, status, atau daftar hak akses (`permission_ids`) peran kustom.
+        **Aturan Bisnis**: Peran bawaan sistem (`is_system = true` atau `DEVELOPER`) diproteksi dan tidak dapat diubah strukturnya.
+
+        #### 📋 Skema Request Body:
+        | Field | Tipe Data | Status | Validasi / Aturan | Keterangan & Contoh |
+        | :--- | :--- | :--- | :--- | :--- |
+        | `name` | `string` | *Opsional* | Min 2, Max 100 karakter | Nama peran baru (`Senior Assistant Manager`) |
+        | `description` | `string` | *Opsional* | Max 500 karakter | Deskripsi tanggung jawab peran yang baru |
+        | `tier` | `string` | *Opsional* | Enum: `ORGANIZATION`, `BRAND`, `OUTLET` | Tingkatan cakupan peran |
+        | `status` | `string` | *Opsional* | Enum: `ACTIVE`, `INACTIVE` | Status keaktifan peran (`ACTIVE`) |
+        | `permission_ids` | `array[string]` | *Opsional* | Array UUID v4 valid | Daftar ID izin terbaru (akan menimpa / replace izin sebelumnya) |
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: UUID peran
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateRoleRequest'
+      responses:
+        '200':
+          description: Peran berhasil diperbarui.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoleDetailResponseEnvelope'
+        '403':
+          description: Upaya mengubah peran bawaan sistem ditolak.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Peran tidak ditemukan.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+    delete:
+      tags:
+        - Role Management
+      summary: Hapus Peran Kustom (Soft Delete)
+      description: >-
+        Menghapus peran kustom dari organisasi.
+        **Aturan Bisnis**:
+        1. Peran bawaan sistem tidak dapat dihapus (`ROLE_PROTECTED`).
+        2. Peran yang masih aktif ditugaskan kepada staf tidak dapat dihapus (`ROLE_IN_USE`).
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: UUID peran
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Peran berhasil dihapus.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        '403':
+          description: Upaya menghapus peran sistem ditolak.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Peran tidak ditemukan.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Peran masih digunakan oleh pengguna aktif.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
 
 components:
   securitySchemes:
@@ -540,9 +910,13 @@ components:
       properties:
         identifier:
           type: string
+          description: "[WAJIB] Alamat email akun atau username staf"
           example: "owner@harmoni.id"
         password:
           type: string
+          format: password
+          minLength: 6
+          description: "[WAJIB] Kata sandi akun login (minimal 6 karakter)"
           example: "Password123!"
 
     AuthSuccessResponse:
@@ -684,6 +1058,11 @@ components:
           type: string
           format: uuid
           nullable: true
+        role_id:
+          type: string
+          format: uuid
+          nullable: true
+          example: "04826e26-f9e9-4200-b653-18b2b652c13c"
         username:
           type: string
         email:
@@ -705,6 +1084,9 @@ components:
           nullable: true
         outlet:
           $ref: '#/components/schemas/OutletSummary'
+          nullable: true
+        role:
+          $ref: '#/components/schemas/RoleSummary'
           nullable: true
 
     UserListResponse:
@@ -742,57 +1124,109 @@ components:
         - email
         - password
       properties:
-        brand_id:
-          type: string
-          format: uuid
-          nullable: true
-        outlet_id:
-          type: string
-          format: uuid
-          nullable: true
         username:
           type: string
+          minLength: 3
+          maxLength: 50
           example: "kasir.kemang"
+          description: "[WAJIB] Username unik staf untuk login sistem back-office (3-50 karakter)"
         email:
           type: string
           format: email
           example: "kasir.kemang@harmoni.id"
+          description: "[WAJIB] Alamat email unik staf"
         password:
           type: string
           format: password
+          minLength: 8
           example: "Password123!"
-        pin:
+          description: "[WAJIB] Password akun staf (min 8 karakter, otomatis di-hash Bcrypt)"
+        role_id:
           type: string
-          example: "123456"
-        status:
-          type: string
-          enum: [ACTIVE, INACTIVE, SUSPENDED]
-          default: ACTIVE
-
-    UpdateUserRequest:
-      type: object
-      properties:
+          format: uuid
+          nullable: true
+          example: "04826e26-f9e9-4200-b653-18b2b652c13c"
+          description: "[OPSIONAL] UUID Peran staf dari GET /api/v1/roles/lookup untuk hak akses"
         brand_id:
           type: string
           format: uuid
           nullable: true
+          example: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          description: "[OPSIONAL] UUID Brand FnB (wajib diisi jika peran berlevel BRAND atau OUTLET)"
         outlet_id:
           type: string
           format: uuid
           nullable: true
-        username:
-          type: string
-        email:
-          type: string
-          format: email
-        password:
-          type: string
-          format: password
+          example: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          description: "[OPSIONAL] UUID Outlet fisik cabang (wajib diisi jika peran berlevel OUTLET seperti Kasir/Barista)"
         pin:
           type: string
+          minLength: 4
+          maxLength: 8
+          nullable: true
+          example: "123456"
+          description: "[OPSIONAL] PIN kasir POS tablet (4-8 digit numerik, otomatis di-hash Bcrypt)"
         status:
           type: string
           enum: [ACTIVE, INACTIVE, SUSPENDED]
+          default: ACTIVE
+          example: "ACTIVE"
+          description: "[OPSIONAL] Status awal akun pengguna (default: ACTIVE)"
+
+    UpdateUserRequest:
+      type: object
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 50
+          nullable: true
+          example: "kasir.kemang.baru"
+          description: "[OPSIONAL] Username baru akun staf (3-50 karakter)"
+        email:
+          type: string
+          format: email
+          nullable: true
+          example: "kasir.kemang@harmoni.id"
+          description: "[OPSIONAL] Alamat email baru staf"
+        password:
+          type: string
+          format: password
+          minLength: 8
+          nullable: true
+          example: "NewPassword123!"
+          description: "[OPSIONAL] Password baru jika ingin diubah (min 8 karakter)"
+        role_id:
+          type: string
+          format: uuid
+          nullable: true
+          example: "04826e26-f9e9-4200-b653-18b2b652c13c"
+          description: "[OPSIONAL] UUID Peran baru untuk mutasi/promosi staf"
+        brand_id:
+          type: string
+          format: uuid
+          nullable: true
+          example: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          description: "[OPSIONAL] UUID Brand baru jika staf dipindahkan ke brand lain"
+        outlet_id:
+          type: string
+          format: uuid
+          nullable: true
+          example: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          description: "[OPSIONAL] UUID Outlet baru jika staf dipindahkan ke outlet lain"
+        pin:
+          type: string
+          minLength: 4
+          maxLength: 8
+          nullable: true
+          example: "654321"
+          description: "[OPSIONAL] PIN kasir POS baru (4-8 digit numerik)"
+        status:
+          type: string
+          enum: [ACTIVE, INACTIVE, SUSPENDED]
+          nullable: true
+          example: "ACTIVE"
+          description: "[OPSIONAL] Status keaktifan akun pengguna"
 
     UpdateUserStatusRequest:
       type: object
@@ -802,6 +1236,8 @@ components:
         status:
           type: string
           enum: [ACTIVE, INACTIVE, SUSPENDED]
+          example: "ACTIVE"
+          description: "[WAJIB] Status baru akun staf (ACTIVE, INACTIVE, SUSPENDED)"
 
     UserLookupItem:
       type: object
@@ -847,11 +1283,15 @@ components:
       properties:
         current_password:
           type: string
-          example: "OldSecret123"
+          format: password
+          description: "[WAJIB] Kata sandi akun saat ini untuk verifikasi keamanan"
+          example: "OldSecret123!"
         new_password:
           type: string
+          format: password
           minLength: 8
-          example: "NewSecret456"
+          description: "[WAJIB] Kata sandi baru (minimal 8 karakter)"
+          example: "NewSecret456!"
 
     ChangePINRequest:
       type: object
@@ -860,15 +1300,19 @@ components:
       properties:
         current_pin:
           type: string
+          pattern: '^[0-9]{4,8}$'
           minLength: 4
           maxLength: 8
+          nullable: true
           example: "123456"
-          description: Wajib jika pengguna sebelumnya telah memiliki PIN
+          description: "[OPSIONAL] PIN saat ini (wajib jika pengguna sebelumnya telah mengatur PIN)"
         new_pin:
           type: string
+          pattern: '^[0-9]{4,8}$'
           minLength: 4
           maxLength: 8
           example: "654321"
+          description: "[WAJIB] PIN numerik baru untuk mesin kasir/POS tablet (4-8 digit angka)"
 
     PaginationMeta:
       type: object
@@ -895,4 +1339,243 @@ components:
           type: object
           nullable: true
           description: "Objek agregasi atau ringkasan opsional (misal laporan total finansial/transaksi)"
+
+    RoleLookupItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
+        code:
+          type: string
+          example: "BRANCH_MANAGER"
+        name:
+          type: string
+          example: "Branch Manager (Store Manager)"
+        tier:
+          type: string
+          enum: [ORGANIZATION, BRAND, OUTLET]
+          example: "OUTLET"
+
+    RoleLookupResponseEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "lookup peran berhasil diambil"
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/RoleLookupItem'
+        meta:
+          type: object
+          properties:
+            pagination:
+              $ref: '#/components/schemas/PaginationMeta'
+
+    PermissionItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "c73a8308-7244-4b53-911b-1934c9c2229f"
+        code:
+          type: string
+          example: "pos:order:create"
+        group:
+          type: string
+          example: "pos"
+        name:
+          type: string
+          example: "Buat Pesanan POS"
+        description:
+          type: string
+          example: "Membuat pesanan dan menambahkan item di mesin kasir POS"
+
+    PermissionGroupItem:
+      type: object
+      properties:
+        group:
+          type: string
+          example: "pos"
+        group_name:
+          type: string
+          example: "Point of Sale (POS)"
+        permissions:
+          type: array
+          items:
+            $ref: '#/components/schemas/PermissionItem'
+
+    PermissionGroupsResponseEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "daftar izin berhasil diambil"
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/PermissionGroupItem'
+
+    RoleDetail:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "04826e26-f9e9-4200-b653-18b2b652c13c"
+        organization_id:
+          type: string
+          format: uuid
+          nullable: true
+          example: "d3b07384-d113-46fb-9c88-51360098f98d"
+        code:
+          type: string
+          example: "ASSISTANT_MANAGER"
+        name:
+          type: string
+          example: "Asisten Manajer Cabang"
+        description:
+          type: string
+          example: "Membantu operasional dan void pesanan dengan otorisasi supervisor"
+        tier:
+          type: string
+          enum: [ORGANIZATION, BRAND, OUTLET]
+          example: "OUTLET"
+        is_system:
+          type: boolean
+          example: false
+        status:
+          type: string
+          enum: [ACTIVE, INACTIVE]
+          example: "ACTIVE"
+        permissions:
+          type: array
+          items:
+            $ref: '#/components/schemas/PermissionItem'
+        created_at:
+          type: string
+          format: date-time
+          example: "2026-10-19T14:30:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          example: "2026-10-19T14:30:00Z"
+
+    RoleListResponseEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "daftar peran berhasil diambil"
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/RoleDetail'
+        meta:
+          type: object
+          properties:
+            pagination:
+              $ref: '#/components/schemas/PaginationMeta'
+
+    RoleDetailResponseEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "detail peran berhasil diambil"
+        data:
+          $ref: '#/components/schemas/RoleDetail'
+
+    CreateRoleRequest:
+      type: object
+      required:
+        - code
+        - name
+        - tier
+      properties:
+        code:
+          type: string
+          minLength: 2
+          maxLength: 50
+          example: "ASSISTANT_MANAGER"
+          description: "[WAJIB] Kode unik peran berhuruf besar dan underscore (A-Z, 0-9, _). Kode DEVELOPER dilarang."
+        name:
+          type: string
+          minLength: 2
+          maxLength: 100
+          example: "Asisten Manajer Cabang"
+          description: "[WAJIB] Nama tampilan peran untuk antarmuka pengguna"
+        tier:
+          type: string
+          enum: [ORGANIZATION, BRAND, OUTLET]
+          example: "OUTLET"
+          description: "[WAJIB] Batas tingkatan hierarki multi-tenant peran (ORGANIZATION, BRAND, OUTLET)"
+        description:
+          type: string
+          maxLength: 500
+          nullable: true
+          example: "Peran operasional pendamping store manager untuk void pesanan"
+          description: "[OPSIONAL] Deskripsi cakupan tugas atau kewenangan peran"
+        permission_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+          example:
+            - "c73a8308-7244-4b53-911b-1934c9c2229f"
+            - "e82b9419-8355-4c64-a22c-2045d0d3330a"
+          description: "[OPSIONAL] Daftar UUID hak akses izin yang dipasangkan pada peran"
+
+    UpdateRoleRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 100
+          nullable: true
+          example: "Senior Assistant Manager"
+          description: "[OPSIONAL] Nama peran baru yang diperbarui"
+        description:
+          type: string
+          maxLength: 500
+          nullable: true
+          example: "Deskripsi diperbarui"
+          description: "[OPSIONAL] Deskripsi tanggung jawab peran baru"
+        tier:
+          type: string
+          enum: [ORGANIZATION, BRAND, OUTLET]
+          nullable: true
+          example: "OUTLET"
+          description: "[OPSIONAL] Tingkatan hierarki peran"
+        status:
+          type: string
+          enum: [ACTIVE, INACTIVE]
+          nullable: true
+          example: "ACTIVE"
+          description: "[OPSIONAL] Status keaktifan peran (ACTIVE, INACTIVE)"
+        permission_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+          example:
+            - "c73a8308-7244-4b53-911b-1934c9c2229f"
+          description: "[OPSIONAL] Daftar UUID hak akses izin baru (menggantikan seluruh daftar izin sebelumnya)"
+
 

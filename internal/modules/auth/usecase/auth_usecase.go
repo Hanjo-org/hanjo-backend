@@ -9,6 +9,7 @@ import (
 	"go.uber.org/zap"
 
 	authdomain "github.com/hanjo-erp/hanjo/internal/modules/auth/domain"
+	rbacdomain "github.com/hanjo-erp/hanjo/internal/modules/rbac/domain"
 	userdomain "github.com/hanjo-erp/hanjo/internal/modules/user/domain"
 	"github.com/hanjo-erp/hanjo/pkg/jwt"
 	"github.com/hanjo-erp/hanjo/pkg/limiter"
@@ -33,6 +34,7 @@ const (
 
 type authUsecase struct {
 	userRepo        userdomain.UserRepository
+	roleRepo        rbacdomain.RoleRepository
 	jwtManager      *jwt.Manager
 	rateLimiter     limiter.RateLimiter
 	accessDuration  time.Duration
@@ -45,6 +47,7 @@ type authUsecase struct {
 // NewAuthUsecase creates a new AuthUsecase instance with brute-force protection.
 func NewAuthUsecase(
 	userRepo userdomain.UserRepository,
+	roleRepo rbacdomain.RoleRepository,
 	jwtManager *jwt.Manager,
 	rateLimiter limiter.RateLimiter,
 	accessDuration, refreshDuration time.Duration,
@@ -62,6 +65,7 @@ func NewAuthUsecase(
 
 	return &authUsecase{
 		userRepo:        userRepo,
+		roleRepo:        roleRepo,
 		jwtManager:      jwtManager,
 		rateLimiter:     rateLimiter,
 		accessDuration:  accessDuration,
@@ -113,7 +117,7 @@ func (u *authUsecase) Login(ctx context.Context, input LoginInput) (*AuthOutput,
 	// Reset failed attempts on successful login
 	_ = u.rateLimiter.Reset(ctx, rateLimitKey)
 
-	tokenPair, err := u.generateTokenPair(user)
+	tokenPair, err := u.generateTokenPair(ctx, user)
 	if err != nil {
 		u.log.Error("failed to generate token pair", zap.Error(err), zap.String("user_id", user.ID))
 		return nil, err
@@ -179,7 +183,7 @@ func (u *authUsecase) POSLogin(ctx context.Context, input POSLoginInput) (*AuthO
 	// Reset failed attempts on successful login
 	_ = u.rateLimiter.Reset(ctx, rateLimitKey)
 
-	tokenPair, err := u.generateTokenPair(user)
+	tokenPair, err := u.generateTokenPair(ctx, user)
 	if err != nil {
 		u.log.Error("failed to generate token pair for pos", zap.Error(err), zap.String("user_id", user.ID))
 		return nil, err
@@ -210,7 +214,7 @@ func (u *authUsecase) RefreshToken(ctx context.Context, refreshTokenString strin
 		return nil, authdomain.ErrAccountInactive
 	}
 
-	return u.generateTokenPair(user)
+	return u.generateTokenPair(ctx, user)
 }
 
 func (u *authUsecase) Me(ctx context.Context, userID string) (*UserProfileOutput, error) {
@@ -222,6 +226,7 @@ func (u *authUsecase) Me(ctx context.Context, userID string) (*UserProfileOutput
 	return &UserProfileOutput{
 		ID:             user.ID,
 		OrganizationID: user.OrganizationID,
+		RoleID:         user.RoleID,
 		BrandID:        user.BrandID,
 		OutletID:       user.OutletID,
 		Username:       user.Username,
@@ -232,14 +237,27 @@ func (u *authUsecase) Me(ctx context.Context, userID string) (*UserProfileOutput
 	}, nil
 }
 
-func (u *authUsecase) generateTokenPair(user *userdomain.User) (*authdomain.TokenPair, error) {
+func (u *authUsecase) generateTokenPair(ctx context.Context, user *userdomain.User) (*authdomain.TokenPair, error) {
 	now := time.Now()
 	accessExpiresAt := now.Add(u.accessDuration)
+
+	var roleCode string
+	var roleID string
+	if user.RoleID != nil && *user.RoleID != "" {
+		roleID = *user.RoleID
+		if u.roleRepo != nil {
+			if r, err := u.roleRepo.GetByID(ctx, roleID); err == nil && r != nil {
+				roleCode = r.Code
+			}
+		}
+	}
 
 	accessPayload := jwt.TokenPayload{
 		UserID:         user.ID,
 		Email:          user.Email,
 		Name:           user.Username,
+		Role:           roleCode,
+		RoleID:         roleID,
 		OrganizationID: user.OrganizationID,
 		BrandID:        ptr.Val(user.BrandID),
 		OutletID:       ptr.Val(user.OutletID),
@@ -254,6 +272,8 @@ func (u *authUsecase) generateTokenPair(user *userdomain.User) (*authdomain.Toke
 	refreshPayload := jwt.TokenPayload{
 		UserID:         user.ID,
 		Email:          user.Email,
+		Role:           roleCode,
+		RoleID:         roleID,
 		OrganizationID: user.OrganizationID,
 		BrandID:        ptr.Val(user.BrandID),
 		OutletID:       ptr.Val(user.OutletID),
@@ -278,6 +298,7 @@ func toUserOutput(user *userdomain.User) UserOutput {
 	return UserOutput{
 		ID:             user.ID,
 		OrganizationID: user.OrganizationID,
+		RoleID:         user.RoleID,
 		BrandID:        user.BrandID,
 		OutletID:       user.OutletID,
 		Username:       user.Username,

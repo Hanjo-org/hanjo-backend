@@ -11,6 +11,7 @@ import (
 type UserModel struct {
 	ID             string         `gorm:"column:id;type:uuid;primaryKey"`
 	OrganizationID string         `gorm:"column:organization_id;type:uuid;not null;index"`
+	RoleID         *string        `gorm:"column:role_id;type:uuid;index"`
 	BrandID        *string        `gorm:"column:brand_id;type:uuid;index"`
 	OutletID       *string        `gorm:"column:outlet_id;type:uuid;index"`
 	Username       string         `gorm:"column:username;type:varchar(100);not null"`
@@ -40,6 +41,7 @@ func (m *UserModel) ToDomain() *domain.User {
 	return &domain.User{
 		ID:             m.ID,
 		OrganizationID: m.OrganizationID,
+		RoleID:         m.RoleID,
 		BrandID:        m.BrandID,
 		OutletID:       m.OutletID,
 		Username:       m.Username,
@@ -66,6 +68,7 @@ func FromUserDomain(d *domain.User) *UserModel {
 	return &UserModel{
 		ID:             d.ID,
 		OrganizationID: d.OrganizationID,
+		RoleID:         d.RoleID,
 		BrandID:        d.BrandID,
 		OutletID:       d.OutletID,
 		Username:       d.Username,

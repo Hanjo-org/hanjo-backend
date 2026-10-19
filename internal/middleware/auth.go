@@ -30,6 +30,9 @@ func Auth(manager *jwt.Manager) fiber.Handler {
 
 		contextutil.SetUserID(c, claims.UserID)
 		contextutil.SetUserRole(c, claims.Role)
+		if claims.RoleID != "" {
+			contextutil.SetUserRoleID(c, claims.RoleID)
+		}
 		if claims.Email != "" {
 			contextutil.SetUserEmail(c, claims.Email)
 		}
