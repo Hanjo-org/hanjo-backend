@@ -143,9 +143,20 @@ paths:
       tags:
         - User Management
       summary: Tambah Pengguna / Staf Baru
-      description: >-
-        Menambahkan staf, kasir, atau manajer baru. Password di-hash menggunakan Bcrypt,
-        dan PIN kasir POS (jika diisi) di-hash secara aman.
+      description: |
+        Menambahkan staf, kasir, atau manajer baru. Password di-hash menggunakan Bcrypt, dan PIN kasir POS (jika diisi) di-hash secara aman.
+
+        #### 📋 Skema Request Body:
+        | Field | Tipe Data | Status | Validasi / Aturan | Keterangan & Contoh |
+        | :--- | :--- | :--- | :--- | :--- |
+        | `username` | `string` | **Wajib** | Min 3, Max 50 karakter | Username unik staf untuk login back-office (`kasir.kemang`) |
+        | `email` | `string (email)` | **Wajib** | Format email valid | Alamat email unik staf (`kasir.kemang@harmoni.id`) |
+        | `password` | `string` | **Wajib** | Min 8 karakter | Password login awal (di-hash menggunakan Bcrypt) |
+        | `role_id` | `string (uuid)` | *Opsional* | UUID v4 valid | ID peran dari `GET /api/v1/roles/lookup` untuk kontrol akses staf |
+        | `brand_id` | `string (uuid)` | *Opsional* | UUID v4 valid | ID brand FnB (wajib jika peran berlevel `BRAND` atau `OUTLET`) |
+        | `outlet_id` | `string (uuid)` | *Opsional* | UUID v4 valid | ID outlet fisik (wajib jika peran berlevel `OUTLET` / kasir) |
+        | `pin` | `string` | *Opsional* | 4 - 8 digit numerik | PIN kasir untuk login cepat di POS tablet (di-hash aman) |
+        | `status` | `string` | *Opsional* | Enum: `ACTIVE`, `INACTIVE`, `SUSPENDED` | Status keaktifan akun pengguna (default: `ACTIVE`) |
       security:
         - BearerAuth: []
       requestBody:
@@ -214,7 +225,20 @@ paths:
       tags:
         - User Management
       summary: Update Data Pengguna
-      description: Mengubah profil staf, re-assign outlet atau brand, serta update password/PIN.
+      description: |
+        Mengubah profil staf, re-assign outlet atau brand, perbarui peran (role), serta update password/PIN.
+
+        #### 📋 Skema Request Body:
+        | Field | Tipe Data | Status | Validasi / Aturan | Keterangan & Contoh |
+        | :--- | :--- | :--- | :--- | :--- |
+        | `username` | `string` | *Opsional* | Min 3, Max 50 karakter | Username baru akun jika ingin diperbarui |
+        | `email` | `string (email)` | *Opsional* | Format email valid | Email baru akun jika ingin diperbarui |
+        | `password` | `string` | *Opsional* | Min 8 karakter | Password baru (kosongkan jika tidak diganti) |
+        | `role_id` | `string (uuid)` | *Opsional* | UUID v4 valid | ID peran baru jika staf dipromosikan / dimutasi peran |
+        | `brand_id` | `string (uuid)` | *Opsional* | UUID v4 valid | ID brand baru jika staf dipindahkan ke brand lain |
+        | `outlet_id` | `string (uuid)` | *Opsional* | UUID v4 valid | ID outlet baru jika staf dipindahkan ke cabang lain |
+        | `pin` | `string` | *Opsional* | 4 - 8 digit numerik | PIN kasir POS baru (kosongkan jika tidak diganti) |
+        | `status` | `string` | *Opsional* | Enum: `ACTIVE`, `INACTIVE`, `SUSPENDED` | Status akun pengguna |
       security:
         - BearerAuth: []
       parameters:
@@ -285,7 +309,13 @@ paths:
       tags:
         - User Management
       summary: Toggle Status Pengguna
-      description: Mengubah status aktif/nonaktif akun staf (ACTIVE, INACTIVE, SUSPENDED).
+      description: |
+        Mengubah status aktif/nonaktif akun staf (ACTIVE, INACTIVE, SUSPENDED).
+
+        #### 📋 Skema Request Body:
+        | Field | Tipe Data | Status | Validasi / Aturan | Keterangan & Contoh |
+        | :--- | :--- | :--- | :--- | :--- |
+        | `status` | `string` | **Wajib** | Enum: `ACTIVE`, `INACTIVE`, `SUSPENDED` | Status baru akun staf (`SUSPENDED`) |
       security:
         - BearerAuth: []
       parameters:
@@ -398,6 +428,24 @@ components:
         address:
           type: string
 
+    RoleSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "04826e26-f9e9-4200-b653-18b2b652c13c"
+        code:
+          type: string
+          example: "CASHIER"
+        name:
+          type: string
+          example: "Kasir POS"
+        tier:
+          type: string
+          enum: [ORGANIZATION, BRAND, OUTLET]
+          example: "OUTLET"
+
     UserWithRelations:
       type: object
       properties:
@@ -415,6 +463,11 @@ components:
           type: string
           format: uuid
           nullable: true
+        role_id:
+          type: string
+          format: uuid
+          nullable: true
+          example: "04826e26-f9e9-4200-b653-18b2b652c13c"
         username:
           type: string
         email:
@@ -436,6 +489,9 @@ components:
           nullable: true
         outlet:
           $ref: '#/components/schemas/OutletSummary'
+          nullable: true
+        role:
+          $ref: '#/components/schemas/RoleSummary'
           nullable: true
 
     UserListResponse:
@@ -479,58 +535,109 @@ components:
         - email
         - password
       properties:
-        brand_id:
-          type: string
-          format: uuid
-          nullable: true
-        outlet_id:
-          type: string
-          format: uuid
-          nullable: true
         username:
           type: string
+          minLength: 3
+          maxLength: 50
           example: "kasir.kemang"
+          description: "[WAJIB] Username unik staf untuk login sistem back-office (3-50 karakter)"
         email:
           type: string
           format: email
           example: "kasir.kemang@harmoni.id"
+          description: "[WAJIB] Alamat email unik staf"
         password:
           type: string
           format: password
+          minLength: 8
           example: "Password123!"
-        pin:
+          description: "[WAJIB] Password akun staf (min 8 karakter, otomatis di-hash Bcrypt)"
+        role_id:
           type: string
-          example: "123456"
-          description: "PIN kasir POS (4-8 digit numeric)"
-        status:
-          type: string
-          enum: [ACTIVE, INACTIVE, SUSPENDED]
-          default: ACTIVE
-
-    UpdateUserRequest:
-      type: object
-      properties:
+          format: uuid
+          nullable: true
+          example: "04826e26-f9e9-4200-b653-18b2b652c13c"
+          description: "[OPSIONAL] UUID Peran staf dari GET /api/v1/roles/lookup untuk hak akses"
         brand_id:
           type: string
           format: uuid
           nullable: true
+          example: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          description: "[OPSIONAL] UUID Brand FnB (wajib diisi jika peran berlevel BRAND atau OUTLET)"
         outlet_id:
           type: string
           format: uuid
           nullable: true
-        username:
-          type: string
-        email:
-          type: string
-          format: email
-        password:
-          type: string
-          format: password
+          example: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          description: "[OPSIONAL] UUID Outlet fisik cabang (wajib diisi jika peran berlevel OUTLET seperti Kasir/Barista)"
         pin:
           type: string
+          minLength: 4
+          maxLength: 8
+          nullable: true
+          example: "123456"
+          description: "[OPSIONAL] PIN kasir POS tablet (4-8 digit numerik, otomatis di-hash Bcrypt)"
         status:
           type: string
           enum: [ACTIVE, INACTIVE, SUSPENDED]
+          default: ACTIVE
+          example: "ACTIVE"
+          description: "[OPSIONAL] Status awal akun pengguna (default: ACTIVE)"
+
+    UpdateUserRequest:
+      type: object
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 50
+          nullable: true
+          example: "kasir.kemang.baru"
+          description: "[OPSIONAL] Username baru akun staf (3-50 karakter)"
+        email:
+          type: string
+          format: email
+          nullable: true
+          example: "kasir.kemang@harmoni.id"
+          description: "[OPSIONAL] Alamat email baru staf"
+        password:
+          type: string
+          format: password
+          minLength: 8
+          nullable: true
+          example: "NewPassword123!"
+          description: "[OPSIONAL] Password baru jika ingin diubah (min 8 karakter)"
+        role_id:
+          type: string
+          format: uuid
+          nullable: true
+          example: "04826e26-f9e9-4200-b653-18b2b652c13c"
+          description: "[OPSIONAL] UUID Peran baru untuk mutasi/promosi staf"
+        brand_id:
+          type: string
+          format: uuid
+          nullable: true
+          example: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          description: "[OPSIONAL] UUID Brand baru jika staf dipindahkan ke brand lain"
+        outlet_id:
+          type: string
+          format: uuid
+          nullable: true
+          example: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          description: "[OPSIONAL] UUID Outlet baru jika staf dipindahkan ke outlet lain"
+        pin:
+          type: string
+          minLength: 4
+          maxLength: 8
+          nullable: true
+          example: "654321"
+          description: "[OPSIONAL] PIN kasir POS baru (4-8 digit numerik)"
+        status:
+          type: string
+          enum: [ACTIVE, INACTIVE, SUSPENDED]
+          nullable: true
+          example: "ACTIVE"
+          description: "[OPSIONAL] Status keaktifan akun pengguna"
 
     UpdateUserStatusRequest:
       type: object
@@ -540,6 +647,8 @@ components:
         status:
           type: string
           enum: [ACTIVE, INACTIVE, SUSPENDED]
+          example: "ACTIVE"
+          description: "[WAJIB] Status baru akun staf (ACTIVE, INACTIVE, SUSPENDED)"
 
     UserLookupItem:
       type: object

@@ -34,9 +34,16 @@ paths:
       tags:
         - POS Authentication
       summary: Quick PIN Login Mesin Kasir / POS Tablet
-      description: >-
+      description: |
         Login cepat kasir/barista di outlet fisik menggunakan kombinasi `outlet_id`, `username`, dan `pin` (4-8 digit).
         Mengembalikan Access Token RS256 dan menyetel HttpOnly Cookie `refresh_token`.
+
+        #### 📋 Skema Request Body:
+        | Field | Tipe Data | Status | Validasi / Aturan | Keterangan & Contoh |
+        | :--- | :--- | :--- | :--- | :--- |
+        | `outlet_id` | `string (uuid)` | **Wajib** | UUID v4 valid | ID unik Outlet fisik tempat mesin kasir / tablet POS berada |
+        | `username` | `string` | **Wajib** | String non-empty | Username staf kasir / barista di outlet (`kasir.kemang`) |
+        | `pin` | `string` | **Wajib** | 4 - 8 digit numerik | PIN kasir yang telah disetel (`123456`) |
       requestBody:
         required: true
         content:
@@ -74,7 +81,13 @@ paths:
       tags:
         - POS Authentication
       summary: Refresh Access Token Mesin POS
-      description: Memperbarui access token kasir tanpa login ulang.
+      description: |
+        Memperbarui access token kasir tanpa login ulang.
+
+        #### 📋 Skema Request Body:
+        | Field | Tipe Data | Status | Validasi / Aturan | Keterangan & Contoh |
+        | :--- | :--- | :--- | :--- | :--- |
+        | `refresh_token` | `string` | *Opsional* | JWT string valid | Token penyegar (opsional jika dikirim via HttpOnly cookie) |
       requestBody:
         required: false
         content:
@@ -280,14 +293,19 @@ components:
         outlet_id:
           type: string
           format: uuid
+          description: "[WAJIB] ID unik Outlet fisik tempat mesin kasir / terminal POS beroperasi"
           example: "04826e26-f9e9-4200-b653-18b2b652c13c"
         username:
           type: string
+          description: "[WAJIB] Username staf kasir / barista di outlet tersebut"
           example: "kasir.kemang"
         pin:
           type: string
+          pattern: '^[0-9]{4,8}$'
+          minLength: 4
+          maxLength: 8
+          description: "[WAJIB] PIN numerik kasir (4-8 digit angka)"
           example: "123456"
-          description: "PIN numerik kasir (4-8 digit)"
 
     AuthSuccessResponse:
       type: object
