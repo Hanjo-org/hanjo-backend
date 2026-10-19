@@ -57,6 +57,16 @@ func TestEndpoints(t *testing.T) {
 			expectedCode: http.StatusOK,
 		},
 		{
+			name:         "RBAC Module YAML",
+			url:          "/docs/modules/rbac.yaml",
+			expectedCode: http.StatusOK,
+		},
+		{
+			name:         "Backoffice Client Spec YAML",
+			url:          "/docs/specs/backoffice.yaml",
+			expectedCode: http.StatusOK,
+		},
+		{
 			name:         "Swagger Alias Redirect",
 			url:          "/swagger",
 			expectedCode: http.StatusFound,

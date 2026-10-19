@@ -121,7 +121,13 @@ func main() {
 		fmt.Printf("✅ Outlet created: %s (%s)\n", outletBSD.Name, outletBSD.Code)
 	}
 
-	// 4. Users & Staff
+	// 4. RBAC Master Seeding (Permissions, System Roles, and Role Permissions)
+	rolesMap, err := seedRBAC(ctx, db, log)
+	if err != nil {
+		log.Fatal("failed to seed RBAC master data", zap.Error(err))
+	}
+
+	// 5. Users & Staff
 	defaultPassword, err := password.Hash("Password123!")
 	if err != nil {
 		log.Fatal("failed to hash password", zap.Error(err))
@@ -138,6 +144,7 @@ func main() {
 	usersToSeed := []struct {
 		username string
 		email    string
+		roleCode string
 		brandID  *string
 		outletID *string
 		pin      *string
@@ -146,13 +153,15 @@ func main() {
 		{
 			username: "developer",
 			email:    "dev@hanjo.id",
+			roleCode: "DEVELOPER",
 			brandID:  nil, // Global / Full Access
 			outletID: nil,
-			roleDesc: "Developer / Super Admin (Full Access)",
+			roleDesc: "Developer / Super Admin (Full Access & Bypass)",
 		},
 		{
 			username: "owner",
 			email:    "owner@harmoni.id",
+			roleCode: "OWNER",
 			brandID:  nil, // Global HQ scope
 			outletID: nil,
 			roleDesc: "Owner / Group Management",
@@ -160,6 +169,7 @@ func main() {
 		{
 			username: "manager.daily",
 			email:    "manager.daily@harmoni.id",
+			roleCode: "BRAND_MANAGER",
 			brandID:  &brandDaily.ID, // Scoped to Daily Coffee
 			outletID: nil,
 			roleDesc: "Brand Manager Daily Coffee",
@@ -167,6 +177,7 @@ func main() {
 		{
 			username: "manager.kemang",
 			email:    "manager.kemang@harmoni.id",
+			roleCode: "BRANCH_MANAGER",
 			brandID:  &brandDaily.ID,
 			outletID: &outletKemang.ID, // Scoped to Kemang outlet
 			roleDesc: "Branch Manager Kemang",
@@ -174,6 +185,7 @@ func main() {
 		{
 			username: "kasir.kemang",
 			email:    "kasir.kemang@harmoni.id",
+			roleCode: "CASHIER",
 			brandID:  &brandDaily.ID,
 			outletID: &outletKemang.ID,
 			pin:      &defaultCashierPIN, // PIN: 123456
@@ -182,6 +194,7 @@ func main() {
 		{
 			username: "barista.kemang",
 			email:    "barista.kemang@harmoni.id",
+			roleCode: "BARISTA",
 			brandID:  &brandDaily.ID,
 			outletID: &outletKemang.ID,
 			pin:      &defaultBaristaPIN, // PIN: 654321
@@ -190,9 +203,15 @@ func main() {
 	}
 
 	for _, u := range usersToSeed {
+		roleID, hasRole := rolesMap[u.roleCode]
+		if !hasRole {
+			log.Fatal("missing role ID for role code: " + u.roleCode)
+		}
+
 		user, err := userRepo.GetByEmail(ctx, u.email)
 		if err != nil {
 			newUser := userdomain.NewUser(org.ID, u.username, u.email, defaultPassword)
+			newUser.RoleID = ptr.Ptr(roleID)
 			newUser.BrandID = u.brandID
 			newUser.OutletID = u.outletID
 			newUser.Pin = u.pin
@@ -200,14 +219,15 @@ func main() {
 			if err := userRepo.Create(ctx, newUser); err != nil {
 				log.Fatal("failed to seed user "+u.username, zap.Error(err))
 			}
-			fmt.Printf("✅ User created: %s (%s) - %s\n", u.username, u.email, u.roleDesc)
+			fmt.Printf("✅ User created: %s (%s) - %s [Role: %s]\n", u.username, u.email, u.roleDesc, u.roleCode)
 		} else {
+			user.RoleID = ptr.Ptr(roleID)
 			user.Password = defaultPassword
 			user.Pin = u.pin
 			if err := userRepo.Update(ctx, user); err != nil {
 				log.Fatal("failed to update user "+u.username, zap.Error(err))
 			}
-			fmt.Printf("🔄 User updated with bcrypt: %s (%s)\n", user.Username, user.Email)
+			fmt.Printf("🔄 User updated with role %s: %s (%s)\n", u.roleCode, user.Username, user.Email)
 		}
 	}
 

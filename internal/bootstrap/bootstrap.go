@@ -1,6 +1,7 @@
 package bootstrap
 
 import (
+	"context"
 	"crypto/rsa"
 	"os"
 
@@ -15,6 +16,9 @@ import (
 	authdelivery "github.com/hanjo-erp/hanjo/internal/modules/auth/delivery"
 	authusecase "github.com/hanjo-erp/hanjo/internal/modules/auth/usecase"
 	orginfra "github.com/hanjo-erp/hanjo/internal/modules/organization/infrastructure"
+	rbacdelivery "github.com/hanjo-erp/hanjo/internal/modules/rbac/delivery"
+	rbacinfra "github.com/hanjo-erp/hanjo/internal/modules/rbac/infrastructure"
+	rbacusecase "github.com/hanjo-erp/hanjo/internal/modules/rbac/usecase"
 	userdelivery "github.com/hanjo-erp/hanjo/internal/modules/user/delivery"
 	userinfra "github.com/hanjo-erp/hanjo/internal/modules/user/infrastructure"
 	userusecase "github.com/hanjo-erp/hanjo/internal/modules/user/usecase"
@@ -106,10 +110,25 @@ func SetupApp(cfg *config.Config, db *gorm.DB, log *zap.Logger) *fiber.App {
 	orgRepo := orginfra.NewOrganizationRepository(db)
 	brandRepo := orginfra.NewBrandRepository(db)
 	outletRepo := orginfra.NewOutletRepository(db)
+	roleRepo := rbacinfra.NewRoleRepository(db)
+	permRepo := rbacinfra.NewPermissionRepository(db)
+
+	// RBAC In-Memory Cache
+	rbacCache := rbacinfra.NewRBACCache(roleRepo, log)
+	if db != nil {
+		if err := rbacCache.Reload(context.Background()); err != nil {
+			log.Warn("initial rbac cache warm-up encountered an issue", zap.Error(err))
+		}
+	}
+
+	// RBAC Module
+	rbacUC := rbacusecase.NewRBACUsecase(roleRepo, permRepo, rbacCache, log)
+	rbacdelivery.RegisterRBACRoutes(v1, rbacUC, jwtManager)
 
 	// Auth Module
 	authUC := authusecase.NewAuthUsecase(
 		userRepo,
+		roleRepo,
 		jwtManager,
 		rateLimiter,
 		cfg.JWTExpiration,
@@ -130,6 +149,7 @@ func SetupApp(cfg *config.Config, db *gorm.DB, log *zap.Logger) *fiber.App {
 		orgRepo,
 		brandRepo,
 		outletRepo,
+		roleRepo,
 		log,
 	)
 	userdelivery.RegisterUserRoutes(

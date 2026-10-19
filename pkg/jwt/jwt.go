@@ -25,6 +25,7 @@ type Claims struct {
 	Email          string `json:"email,omitempty"`
 	Name           string `json:"name,omitempty"`
 	Role           string `json:"role,omitempty"`
+	RoleID         string `json:"role_id,omitempty"`
 	OrganizationID string `json:"organization_id,omitempty"`
 	BrandID        string `json:"brand_id,omitempty"`
 	OutletID       string `json:"outlet_id,omitempty"`
@@ -40,6 +41,7 @@ type TokenPayload struct {
 	Email          string
 	Name           string
 	Role           string
+	RoleID         string
 	OrganizationID string
 	BrandID        string
 	OutletID       string
@@ -79,6 +81,7 @@ func (m *Manager) GenerateToken(p TokenPayload) (string, error) {
 		Email:          p.Email,
 		Name:           p.Name,
 		Role:           p.Role,
+		RoleID:         p.RoleID,
 		OrganizationID: p.OrganizationID,
 		BrandID:        p.BrandID,
 		OutletID:       p.OutletID,
