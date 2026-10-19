@@ -13,6 +13,7 @@ import (
 type User struct {
 	ID             string     `json:"id"`
 	OrganizationID string     `json:"organization_id"`
+	RoleID         *string    `json:"role_id,omitempty"`
 	BrandID        *string    `json:"brand_id"`
 	OutletID       *string    `json:"outlet_id"`
 	Username       string     `json:"username"`
@@ -63,12 +64,21 @@ type OutletSummary struct {
 	Address string  `json:"address"`
 }
 
-// UserWithRelations embeds related organization, brand, and outlet summaries with a User.
+// RoleSummary represents minimal role details embedded in user queries.
+type RoleSummary struct {
+	ID   string `json:"id"`
+	Code string `json:"code"`
+	Name string `json:"name"`
+	Tier string `json:"tier"`
+}
+
+// UserWithRelations embeds related organization, brand, outlet, and role summaries with a User.
 type UserWithRelations struct {
 	*User
 	Organization *OrganizationSummary `json:"organization"`
 	Brand        *BrandSummary        `json:"brand"`
 	Outlet       *OutletSummary       `json:"outlet"`
+	Role         *RoleSummary         `json:"role"`
 }
 
 // UserLookup represents a lightweight reference of an active user for UI comboboxes and dropdowns.

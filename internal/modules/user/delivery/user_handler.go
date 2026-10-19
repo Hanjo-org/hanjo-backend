@@ -161,6 +161,7 @@ func (h *UserHandler) Create(c fiber.Ctx) error {
 
 	input := usecase.CreateUserInput{
 		OrganizationID: orgID,
+		RoleID:         req.RoleID,
 		BrandID:        req.BrandID,
 		OutletID:       req.OutletID,
 		Username:       req.Username,
@@ -200,6 +201,7 @@ func (h *UserHandler) Update(c fiber.Ctx) error {
 	}
 
 	input := usecase.UpdateUserInput{
+		RoleID:   req.RoleID,
 		BrandID:  req.BrandID,
 		OutletID: req.OutletID,
 		Username: req.Username,

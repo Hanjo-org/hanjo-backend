@@ -9,6 +9,7 @@ import (
 	"go.uber.org/zap"
 
 	orgdomain "github.com/hanjo-erp/hanjo/internal/modules/organization/domain"
+	rbacdomain "github.com/hanjo-erp/hanjo/internal/modules/rbac/domain"
 	"github.com/hanjo-erp/hanjo/internal/modules/user/domain"
 	"github.com/hanjo-erp/hanjo/pkg/password"
 	"github.com/hanjo-erp/hanjo/pkg/response"
@@ -30,6 +31,7 @@ type userUsecase struct {
 	orgRepo    orgdomain.OrganizationRepository
 	brandRepo  orgdomain.BrandRepository
 	outletRepo orgdomain.OutletRepository
+	roleRepo   rbacdomain.RoleRepository
 	log        *zap.Logger
 }
 
@@ -39,6 +41,7 @@ func NewUserUsecase(
 	orgRepo orgdomain.OrganizationRepository,
 	brandRepo orgdomain.BrandRepository,
 	outletRepo orgdomain.OutletRepository,
+	roleRepo rbacdomain.RoleRepository,
 	log *zap.Logger,
 ) UserUsecase {
 	return &userUsecase{
@@ -46,6 +49,7 @@ func NewUserUsecase(
 		orgRepo:    orgRepo,
 		brandRepo:  brandRepo,
 		outletRepo: outletRepo,
+		roleRepo:   roleRepo,
 		log:        log,
 	}
 }
@@ -66,6 +70,7 @@ func (u *userUsecase) List(ctx context.Context, filter domain.UserFilter, params
 	orgIDSet := make(map[string]struct{})
 	brandIDSet := make(map[string]struct{})
 	outletIDSet := make(map[string]struct{})
+	roleIDSet := make(map[string]struct{})
 
 	for _, user := range users {
 		if user.OrganizationID != "" {
@@ -76,6 +81,9 @@ func (u *userUsecase) List(ctx context.Context, filter domain.UserFilter, params
 		}
 		if user.OutletID != nil && *user.OutletID != "" {
 			outletIDSet[*user.OutletID] = struct{}{}
+		}
+		if user.RoleID != nil && *user.RoleID != "" {
+			roleIDSet[*user.RoleID] = struct{}{}
 		}
 	}
 
@@ -92,6 +100,11 @@ func (u *userUsecase) List(ctx context.Context, filter domain.UserFilter, params
 	outletIDs := make([]string, 0, len(outletIDSet))
 	for id := range outletIDSet {
 		outletIDs = append(outletIDs, id)
+	}
+
+	roleIDs := make([]string, 0, len(roleIDSet))
+	for id := range roleIDSet {
+		roleIDs = append(roleIDs, id)
 	}
 
 	// 2. Batch-fetch organizations (Single query, No N+1)
@@ -147,7 +160,25 @@ func (u *userUsecase) List(ctx context.Context, filter domain.UserFilter, params
 		}
 	}
 
-	// 5. Assemble composite UserWithRelations in memory
+	// 5. Batch-fetch roles (Single query, No N+1)
+	roleMap := make(map[string]*domain.RoleSummary, len(roleIDs))
+	if len(roleIDs) > 0 && u.roleRepo != nil {
+		roles, err := u.roleRepo.GetByIDs(ctx, roleIDs)
+		if err != nil {
+			u.log.Warn("failed to batch fetch roles for users", zap.Error(err))
+		} else {
+			for _, r := range roles {
+				roleMap[r.ID] = &domain.RoleSummary{
+					ID:   r.ID,
+					Code: r.Code,
+					Name: r.Name,
+					Tier: string(r.Tier),
+				}
+			}
+		}
+	}
+
+	// 6. Assemble composite UserWithRelations in memory
 	result := make([]*domain.UserWithRelations, len(users))
 	for i, user := range users {
 		var orgSummary *domain.OrganizationSummary
@@ -169,11 +200,19 @@ func (u *userUsecase) List(ctx context.Context, filter domain.UserFilter, params
 			}
 		}
 
+		var roleSummary *domain.RoleSummary
+		if user.RoleID != nil {
+			if s, ok := roleMap[*user.RoleID]; ok {
+				roleSummary = s
+			}
+		}
+
 		result[i] = &domain.UserWithRelations{
 			User:         user,
 			Organization: orgSummary,
 			Brand:        brandSummary,
 			Outlet:       outletSummary,
+			Role:         roleSummary,
 		}
 	}
 
@@ -237,26 +276,39 @@ func (u *userUsecase) Create(ctx context.Context, input CreateUserInput) (*domai
 		}
 	}
 
-	// 4. Check uniqueness of email within organization
+	// 4. Validate Role if specified
+	if input.RoleID != nil && *input.RoleID != "" {
+		if u.roleRepo != nil {
+			role, err := u.roleRepo.GetByID(ctx, *input.RoleID)
+			if err != nil {
+				return nil, rbacdomain.ErrRoleNotFound
+			}
+			if role.Code == "DEVELOPER" {
+				return nil, rbacdomain.ErrDeveloperRoleProtected
+			}
+		}
+	}
+
+	// 5. Check uniqueness of email within organization
 	existingEmail, err := u.userRepo.GetByEmail(ctx, input.Email)
 	if err == nil && existingEmail != nil && existingEmail.OrganizationID == input.OrganizationID {
 		return nil, domain.ErrEmailAlreadyExists
 	}
 
-	// 5. Check uniqueness of username within organization
+	// 6. Check uniqueness of username within organization
 	existingUsername, err := u.userRepo.GetByUsername(ctx, input.OrganizationID, input.Username)
 	if err == nil && existingUsername != nil {
 		return nil, domain.ErrUsernameAlreadyExists
 	}
 
-	// 6. Hash password securely
+	// 7. Hash password securely
 	hashedPassword, err := password.Hash(input.Password)
 	if err != nil {
 		u.log.Error("failed to hash user password", zap.Error(err))
 		return nil, err
 	}
 
-	// 7. Hash PIN if provided
+	// 8. Hash PIN if provided
 	var hashedPIN *string
 	if input.PIN != nil && *input.PIN != "" {
 		hPin, err := password.Hash(*input.PIN)
@@ -279,6 +331,7 @@ func (u *userUsecase) Create(ctx context.Context, input CreateUserInput) (*domai
 	newUser := &domain.User{
 		ID:             uuid.NewString(),
 		OrganizationID: input.OrganizationID,
+		RoleID:         input.RoleID,
 		BrandID:        input.BrandID,
 		OutletID:       input.OutletID,
 		Username:       input.Username,
@@ -307,6 +360,24 @@ func (u *userUsecase) Update(ctx context.Context, orgID, id string, input Update
 
 	if orgID != "" && user.OrganizationID != orgID {
 		return nil, domain.ErrUserNotFound
+	}
+
+	// Role update
+	if input.RoleID != nil {
+		if *input.RoleID != "" {
+			if u.roleRepo != nil {
+				role, err := u.roleRepo.GetByID(ctx, *input.RoleID)
+				if err != nil {
+					return nil, rbacdomain.ErrRoleNotFound
+				}
+				if role.Code == "DEVELOPER" {
+					return nil, rbacdomain.ErrDeveloperRoleProtected
+				}
+			}
+			user.RoleID = input.RoleID
+		} else {
+			user.RoleID = nil
+		}
 	}
 
 	// Brand hierarchy check
@@ -481,10 +552,24 @@ func (u *userUsecase) populateRelations(ctx context.Context, user *domain.User) 
 		}
 	}
 
+	var roleSummary *domain.RoleSummary
+	if user.RoleID != nil && *user.RoleID != "" && u.roleRepo != nil {
+		role, err := u.roleRepo.GetByID(ctx, *user.RoleID)
+		if err == nil && role != nil {
+			roleSummary = &domain.RoleSummary{
+				ID:   role.ID,
+				Code: role.Code,
+				Name: role.Name,
+				Tier: string(role.Tier),
+			}
+		}
+	}
+
 	return &domain.UserWithRelations{
 		User:         user,
 		Organization: orgSummary,
 		Brand:        brandSummary,
 		Outlet:       outletSummary,
+		Role:         roleSummary,
 	}, nil
 }

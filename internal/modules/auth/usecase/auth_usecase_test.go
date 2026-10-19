@@ -96,6 +96,7 @@ func setupTestUsecase(t *testing.T, repo userdomain.UserRepository) (usecase.Aut
 	jwtManager := jwt.NewRSAManager(privKey, pubKey, "hanjo-test", "hanjo-test")
 	uc := usecase.NewAuthUsecase(
 		repo,
+		nil,
 		jwtManager,
 		nil,
 		15*time.Minute,

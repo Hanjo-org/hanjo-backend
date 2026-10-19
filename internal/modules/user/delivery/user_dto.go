@@ -2,6 +2,7 @@ package delivery
 
 // CreateUserRequest defines payload to create a new user/staff member.
 type CreateUserRequest struct {
+	RoleID   *string `json:"role_id" validate:"omitempty,uuid4"`
 	BrandID  *string `json:"brand_id" validate:"omitempty,uuid4"`
 	OutletID *string `json:"outlet_id" validate:"omitempty,uuid4"`
 	Username string  `json:"username" validate:"required,min=3,max=50"`
@@ -13,6 +14,7 @@ type CreateUserRequest struct {
 
 // UpdateUserRequest defines payload for updating an existing user profile or assignments.
 type UpdateUserRequest struct {
+	RoleID   *string `json:"role_id" validate:"omitempty,uuid4"`
 	BrandID  *string `json:"brand_id" validate:"omitempty,uuid4"`
 	OutletID *string `json:"outlet_id" validate:"omitempty,uuid4"`
 	Username *string `json:"username" validate:"omitempty,min=3,max=50"`
