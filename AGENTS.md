@@ -40,6 +40,7 @@ Whenever you are writing, refactoring, or generating code in this repository:
 13. **Financial Precision**: All prices, taxes, discounts, and monetary amounts MUST use `money.Money` (`pkg/money`). Never use float for currency calculations!
 14. **Multi-Tenancy 3-Tier Hierarchy**: Strictly adhere to the 3-Tier model (`Organization` -> `Brand` -> `Outlet`) documented in `.agents/rules/multi-tenancy.md` and `docs/knowledge/multi-tenant-hierarchy.md`. All queries must be tenant-isolated.
 15. **RBAC & Lookup Endpoints**: Strictly adhere to `.agents/rules/rbac-lookup.md` and `.agents/skills/fnb-rbac-lookup/SKILL.md`. Decouple administrative management endpoints (`GET /<entities>`) from operational UI comboboxes (`GET /<entities>/lookup`) with zero sensitive data leakage and active status filtering.
+16. **No Automatic Docker Commands**: NEVER automatically run Docker or Docker Compose commands (`docker ps`, `docker-compose up/down`, etc.) during task execution. Container and Docker daemon management is handled entirely by the user.
 
 ## Skills Index
 
@@ -59,6 +60,7 @@ Whenever you are writing, refactoring, or generating code in this repository:
 - [multi-tenancy.md](.agents/rules/multi-tenancy.md): 3-Tier FnB hierarchy, tenant scoping, and brand/outlet role segregation.
 - [rbac-lookup.md](.agents/rules/rbac-lookup.md): Decoupling administrative CRUD from operational lookup endpoints, RBAC matrix, and Fiber route ordering.
 - [multi-tenant-hierarchy.md](docs/knowledge/multi-tenant-hierarchy.md): Full business background, multi-brand coffee shop use case, and architectural diagram.
+- [master-data-and-uom-architecture.md](docs/knowledge/master-data-and-uom-architecture.md): Master data bottom-up philosophy, multi-brand raw material whitelist, UoM 3-tier layering, and conversion lifecycle.
 - [access-control-hybrid-model.md](docs/knowledge/access-control-hybrid-model.md): Hybrid Access Control (Scoped RBAC + Contextual Policy Guards), 3-layer security model, and FnB authorization patterns.
 - [access-control-catalog.md](docs/knowledge/access-control-catalog.md): Master catalog of all 26 permissions, 9 system roles, and full role-permission access matrix.
 - [architecture.md](.agents/rules/architecture.md): Complete guidelines for Directory Structure, Layers, Dependency Inversion, and Cross-Module Composition.
@@ -70,3 +72,4 @@ Whenever you are writing, refactoring, or generating code in this repository:
 - [response.md](.agents/rules/response.md): Standardized JSON response envelope (`pkg/response`) — success, failure, and pagination meta.
 - [validation.md](.agents/rules/validation.md): Request DTO validation conventions using `pkg/validator` + `response.ValidateOrFail`.
 - [authentication.md](.agents/rules/authentication.md): JWT access & refresh token pattern, HttpOnly cookie handling, and middleware protection.
+- [tooling.md](.agents/rules/tooling.md): Tooling policy prohibiting automatic Docker commands and preserving user environment control.
