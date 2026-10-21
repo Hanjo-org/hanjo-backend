@@ -19,6 +19,9 @@ import (
 	rbacdelivery "github.com/hanjo-erp/hanjo/internal/modules/rbac/delivery"
 	rbacinfra "github.com/hanjo-erp/hanjo/internal/modules/rbac/infrastructure"
 	rbacusecase "github.com/hanjo-erp/hanjo/internal/modules/rbac/usecase"
+	uomdelivery "github.com/hanjo-erp/hanjo/internal/modules/uom/delivery"
+	uominfra "github.com/hanjo-erp/hanjo/internal/modules/uom/infrastructure"
+	uomusecase "github.com/hanjo-erp/hanjo/internal/modules/uom/usecase"
 	userdelivery "github.com/hanjo-erp/hanjo/internal/modules/user/delivery"
 	userinfra "github.com/hanjo-erp/hanjo/internal/modules/user/infrastructure"
 	userusecase "github.com/hanjo-erp/hanjo/internal/modules/user/usecase"
@@ -157,6 +160,12 @@ func SetupApp(cfg *config.Config, db *gorm.DB, log *zap.Logger) *fiber.App {
 		userUC,
 		jwtManager,
 	)
+
+	// UoM Module
+	uomRepo := uominfra.NewUoMRepository(db)
+	uomConvRepo := uominfra.NewConversionRepository(db)
+	uomUC := uomusecase.NewUoMUsecase(uomRepo, uomConvRepo, log)
+	uomdelivery.RegisterUoMRoutes(v1, uomUC, jwtManager)
 
 	return app
 }

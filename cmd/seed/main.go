@@ -127,7 +127,12 @@ func main() {
 		log.Fatal("failed to seed RBAC master data", zap.Error(err))
 	}
 
-	// 5. Users & Staff
+	// 5. UoM Master Seeding (System Default Units and Metric Conversions)
+	if err := seedUoM(ctx, db, log); err != nil {
+		log.Fatal("failed to seed UoM master data", zap.Error(err))
+	}
+
+	// 6. Users & Staff
 	defaultPassword, err := password.Hash("Password123!")
 	if err != nil {
 		log.Fatal("failed to hash password", zap.Error(err))

@@ -1,0 +1,607 @@
+openapi: 3.0.3
+info:
+  title: Hanjo ERP - Unit of Measurement (UoM) & Conversions Module
+  description: >-
+    ### Unit of Measurement & Conversions Specification
+    
+    Spesifikasi RESTful API untuk modul **Unit of Measurement (UoM)** pada Hanjo ERP & POS.
+    Mendukung manajemen satuan atomik (`WEIGHT`, `VOLUME`, `UNIT`), proteksi satuan baku sistem (`is_system = true`),
+    pemisahan lookup operasional UI (`GET /api/v1/uoms/lookup`), serta kalkulasi konversi metrik runtime.
+  version: 1.0.0
+  contact:
+    name: Hanjo Engineering Team
+    email: dev@hanjo.id
+servers:
+  - url: http://localhost:8080
+    description: Local Development Server
+
+tags:
+  - name: UoM Lookups
+    description: Endpoint Lookup Ringkas untuk UI Dropdown & Combobox (Zero Sensitive Data Leakage)
+  - name: UoM Management
+    description: Manajemen Master Satuan (List, Detail, Pembuatan Custom Unit, Update, dan Soft-Delete)
+  - name: UoM Conversions
+    description: Pengelolaan & Eksekusi Konversi Satuan Metrik
+
+paths:
+  /api/v1/uoms/lookup:
+    get:
+      tags:
+        - UoM Lookups
+      summary: Lookup Satuan / Combobox Options
+      description: >-
+        Mengambil daftar satuan aktif secara ringkas (`id`, `name`, `symbol`, `category`, `decimal_places`)
+        khusus untuk kebutuhan dropdown / combobox formulir (misal saat membuat bahan baku atau resep menu).
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: category
+          in: query
+          description: Filter satuan berdasarkan kategori pengukuran
+          schema:
+            type: string
+            enum: [WEIGHT, VOLUME, UNIT]
+      responses:
+        '200':
+          description: Daftar lookup satuan berhasil diambil.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: uom lookup retrieved successfully
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/UoMLookupResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /api/v1/uoms:
+    get:
+      tags:
+        - UoM Management
+      summary: Daftar Master Satuan
+      description: Mengambil seluruh daftar satuan (sistem bawaan dan custom organisasi) dengan pagination, filter kategori, dan pencarian nama/simbol.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          description: Nomor halaman (default 1)
+          schema:
+            type: integer
+            default: 1
+        - name: per_page
+          in: query
+          description: Jumlah item per halaman (default 20, max 100)
+          schema:
+            type: integer
+            default: 20
+        - name: search
+          in: query
+          description: Pencarian berdasarkan nama atau simbol satuan
+          schema:
+            type: string
+        - name: category
+          in: query
+          description: Filter kategori pengukuran
+          schema:
+            type: string
+            enum: [WEIGHT, VOLUME, UNIT]
+        - name: status
+          in: query
+          description: Filter status satuan
+          schema:
+            type: string
+            enum: [ACTIVE, INACTIVE]
+      responses:
+        '200':
+          description: Daftar satuan berhasil diambil.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: uoms retrieved successfully
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/UoMResponse'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+    post:
+      tags:
+        - UoM Management
+      summary: Tambah Custom Satuan Organisasi
+      description: Mendaftarkan satuan custom baru untuk organisasi (misal "Karton 12", "Slop"). Simbol harus unik dalam organisasi.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUoMRequest'
+      responses:
+        '201':
+          description: Satuan baru berhasil dibuat.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: uom created successfully
+                  data:
+                    $ref: '#/components/schemas/UoMResponse'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '409':
+          description: Simbol satuan sudah digunakan.
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/uoms/{id}:
+    get:
+      tags:
+        - UoM Management
+      summary: Detail Satuan
+      description: Mengambil informasi detail satu unit pengukuran berdasarkan UUID.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Detail satuan berhasil diambil.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/UoMResponse'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+    put:
+      tags:
+        - UoM Management
+      summary: Update Satuan Custom
+      description: Memperbarui nama dan status satuan custom. Satuan bawaan sistem (`is_system = true`) dilarang diubah.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUoMRequest'
+      responses:
+        '200':
+          description: Satuan berhasil diperbarui.
+        '403':
+          description: Satuan bawaan sistem dilarang diubah.
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+    delete:
+      tags:
+        - UoM Management
+      summary: Hapus Satuan Custom
+      description: Menghapus satuan custom organisasi (soft-delete). Satuan bawaan sistem (`is_system = true`) dilarang dihapus.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Satuan berhasil dihapus.
+        '403':
+          description: Satuan bawaan sistem dilarang dihapus.
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /api/v1/uom-conversions:
+    get:
+      tags:
+        - UoM Conversions
+      summary: Daftar Aturan Konversi
+      description: Mengambil seluruh aturan konversi satuan standar dan custom organisasi.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Daftar konversi berhasil diambil.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/UoMConversionResponse'
+
+    post:
+      tags:
+        - UoM Conversions
+      summary: Buat Aturan Konversi Baru
+      description: Menambahkan faktor pengali konversi antar dua satuan yang satu kategori (`1 FromUnit = Factor * ToUnit`).
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateConversionRequest'
+      responses:
+        '201':
+          description: Aturan konversi berhasil dibuat.
+        '400':
+          description: Kategori satuan berbeda atau satuan asal dan tujuan sama.
+        '409':
+          description: Aturan konversi sudah ada.
+
+  /api/v1/uom-conversions/{id}:
+    delete:
+      tags:
+        - UoM Conversions
+      summary: Hapus Aturan Konversi
+      description: Menghapus aturan konversi custom organisasi.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Aturan konversi berhasil dihapus.
+        '403':
+          description: Konversi sistem bawaan tidak dapat dihapus.
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /api/v1/uom-conversions/convert:
+    post:
+      tags:
+        - UoM Conversions
+      summary: Kalkulasi Konversi Nilai Satuan (Runtime)
+      description: Mengonversi nilai kuantitas dari satu unit ke unit lain menggunakan pencarian jalur konversi langsung atau inversi otomatis.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConvertQuantityRequest'
+      responses:
+        '200':
+          description: Kuantitas berhasil dikonversi.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/ConvertQuantityResponse'
+        '400':
+          description: Kategori satuan tidak cocok.
+        '404':
+          description: Jalur konversi tidak ditemukan.
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    UoMLookupResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: 72c011cd-6b08-42f3-a11e-55bab47f3447
+        name:
+          type: string
+          example: Gram
+        symbol:
+          type: string
+          example: g
+        category:
+          type: string
+          enum: [WEIGHT, VOLUME, UNIT]
+          example: WEIGHT
+        decimal_places:
+          type: integer
+          example: 2
+
+    UoMResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        organization_id:
+          type: string
+          format: uuid
+          nullable: true
+        name:
+          type: string
+        symbol:
+          type: string
+        category:
+          type: string
+          enum: [WEIGHT, VOLUME, UNIT]
+        decimal_places:
+          type: integer
+        is_system:
+          type: boolean
+        status:
+          type: string
+          enum: [ACTIVE, INACTIVE]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CreateUoMRequest:
+      type: object
+      required:
+        - name
+        - symbol
+        - category
+      properties:
+        name:
+          type: string
+          example: Karton 12
+        symbol:
+          type: string
+          example: ctn12
+        category:
+          type: string
+          enum: [WEIGHT, VOLUME, UNIT]
+          example: UNIT
+        decimal_places:
+          type: integer
+          minimum: 0
+          maximum: 6
+          default: 0
+          example: 0
+
+    UpdateUoMRequest:
+      type: object
+      required:
+        - name
+        - status
+      properties:
+        name:
+          type: string
+          example: Dus Besar 12 Kotak
+        status:
+          type: string
+          enum: [ACTIVE, INACTIVE]
+          example: ACTIVE
+
+    CreateConversionRequest:
+      type: object
+      required:
+        - from_uom_id
+        - to_uom_id
+        - factor
+      properties:
+        from_uom_id:
+          type: string
+          format: uuid
+          example: 9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d
+        to_uom_id:
+          type: string
+          format: uuid
+          example: 72c011cd-6b08-42f3-a11e-55bab47f3447
+        factor:
+          type: number
+          format: double
+          example: 1000.0
+
+    ConvertQuantityRequest:
+      type: object
+      required:
+        - from_uom_id
+        - to_uom_id
+        - quantity
+      properties:
+        from_uom_id:
+          type: string
+          format: uuid
+          example: 9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d
+        to_uom_id:
+          type: string
+          format: uuid
+          example: 72c011cd-6b08-42f3-a11e-55bab47f3447
+        quantity:
+          type: number
+          format: double
+          example: 2.5
+
+    ConvertQuantityResponse:
+      type: object
+      properties:
+        from_uom:
+          $ref: '#/components/schemas/UoMLookupResponse'
+        to_uom:
+          $ref: '#/components/schemas/UoMLookupResponse'
+        original_quantity:
+          type: number
+          example: 2.5
+        converted_quantity:
+          type: number
+          example: 2500.0
+        factor:
+          type: number
+          example: 1000.0
+
+    UoMConversionResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        organization_id:
+          type: string
+          format: uuid
+          nullable: true
+        from_uom_id:
+          type: string
+          format: uuid
+        from_uom_name:
+          type: string
+          example: Kilogram
+        from_uom_symbol:
+          type: string
+          example: kg
+        to_uom_id:
+          type: string
+          format: uuid
+        to_uom_name:
+          type: string
+          example: Gram
+        to_uom_symbol:
+          type: string
+          example: g
+        factor:
+          type: number
+          example: 1000.0
+        is_system:
+          type: boolean
+          example: true
+        created_at:
+          type: string
+          format: date-time
+
+    PaginationMeta:
+      type: object
+      properties:
+        page:
+          type: integer
+          example: 1
+        per_page:
+          type: integer
+          example: 20
+        total_data:
+          type: integer
+          example: 9
+        total_pages:
+          type: integer
+          example: 1
+
+  responses:
+    UnauthorizedError:
+      description: Autentikasi gagal atau token tidak valid.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+              code:
+                type: string
+                example: UNAUTHORIZED
+              message:
+                type: string
+                example: missing or malformed jwt
+    NotFoundError:
+      description: Sumber daya yang diminta tidak ditemukan.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+              code:
+                type: string
+                example: NOT_FOUND
+    BadRequestError:
+      description: Parameter atau format request tidak valid.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+              code:
+                type: string
+                example: BAD_REQUEST
+    ValidationError:
+      description: Validasi input formulir gagal.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+              code:
+                type: string
+                example: VALIDATION_ERROR

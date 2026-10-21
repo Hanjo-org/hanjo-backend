@@ -13,6 +13,8 @@ docs/
 ├── modules/
 │   ├── auth.yaml            # Modul Otentikasi, POS PIN, JWT RS256, & Session
 │   ├── user.yaml            # Modul User & Staff Management
+│   ├── rbac.yaml            # Modul Access Control & RBAC
+│   ├── uom.yaml             # Modul Unit of Measurement & Conversions
 │   └── organization.yaml    # Arsitektur & Model Hierarki Multi-Tenancy 3-Tier
 └── README.md                # Panduan dokumentasi ini
 ```
@@ -29,8 +31,10 @@ Ketika server backend berjalan (`make dev` atau `make run` pada port default `80
     2. **📱 Point of Sale (POS) API (Tablet Kasir & Barista)**
     3. **🌟 Master Gateway & Overview**
     4. **👥 Module: User Management**
-    5. **🔐 Module: Authentication & Session**
-    6. **🏢 Module: Multi-Tenancy (3-Tier)**
+    5. **🛡️ Module: Access Control & RBAC**
+    6. **⚖️ Module: UoM & Conversions**
+    7. **🔐 Module: Authentication & Session**
+    8. **🏢 Module: Multi-Tenancy (3-Tier)**
   * Mendukung tombol **"Try it out"** langsung untuk menguji request HTTP.
   * Mendukung tombol **"Authorize"** dengan memasukkan Access Token JWT (`Bearer <access_token>`).
 * **Back-Office Spec (YAML)**: [http://localhost:8080/docs/specs/backoffice.yaml](http://localhost:8080/docs/specs/backoffice.yaml)
