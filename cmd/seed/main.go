@@ -132,6 +132,11 @@ func main() {
 		log.Fatal("failed to seed UoM master data", zap.Error(err))
 	}
 
+	// 6. Supplier Master Seeding (Demo Suppliers for Organization)
+	if err := seedSuppliers(ctx, db, org.ID, log); err != nil {
+		log.Fatal("failed to seed Supplier master data", zap.Error(err))
+	}
+
 	// 6. Users & Staff
 	defaultPassword, err := password.Hash("Password123!")
 	if err != nil {

@@ -1,0 +1,502 @@
+openapi: 3.0.3
+info:
+  title: Hanjo ERP - Supplier Master Data Module
+  description: >-
+    ### Supplier Master Data Specification
+    
+    Spesifikasi RESTful API untuk modul **Supplier (Vendor Management)** pada Hanjo ERP & POS.
+    Mendukung manajemen data mitra pengadaan bahan baku, tenant isolation berbasis organisasi,
+    pemisahan lookup operasional UI (`GET /api/v1/suppliers/lookup`), pencarian nama/kode/kontak,
+    serta kontrol status vendor aktif/nonaktif.
+  version: 1.0.0
+  contact:
+    name: Hanjo Engineering Team
+    email: dev@hanjo.id
+servers:
+  - url: http://localhost:8080
+    description: Local Development Server
+
+tags:
+  - name: Supplier Lookups
+    description: Endpoint Lookup Ringkas untuk UI Dropdown & Combobox (Zero Sensitive Data Leakage)
+  - name: Supplier Management
+    description: Manajemen Master Data Vendor/Supplier (List, Detail, Pendaftaran Baru, Update, dan Soft-Delete)
+
+paths:
+  /api/v1/suppliers/lookup:
+    get:
+      tags:
+        - Supplier Lookups
+      summary: Lookup Supplier / Combobox Options
+      description: >-
+        Mengambil daftar supplier aktif secara ringkas (`id`, `name`, `code`, `contact_person`, `phone`)
+        khusus untuk kebutuhan dropdown / combobox formulir (misal saat membuat bahan baku atau Purchase Order).
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Daftar lookup supplier berhasil diambil.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: supplier lookup retrieved successfully
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SupplierLookupResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/suppliers:
+    get:
+      tags:
+        - Supplier Management
+      summary: Daftar Master Supplier (Administrative List)
+      description: >-
+        Mengambil daftar supplier organisasi dengan pagination, filter status, dan pencarian nama/kode/kontak.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          description: Nomor halaman
+          schema:
+            type: integer
+            default: 1
+        - name: per_page
+          in: query
+          description: Jumlah data per halaman
+          schema:
+            type: integer
+            default: 20
+        - name: search
+          in: query
+          description: Kata kunci pencarian (nama, kode, contact person, telepon)
+          schema:
+            type: string
+        - name: status
+          in: query
+          description: Filter status supplier
+          schema:
+            type: string
+            enum: [ACTIVE, INACTIVE]
+      responses:
+        '200':
+          description: Daftar supplier berhasil diambil beserta metadata pagination.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: suppliers retrieved successfully
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SupplierResponse'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags:
+        - Supplier Management
+      summary: Tambah Data Supplier Baru
+      description: Mendaftarkan supplier baru ke dalam organisasi tenant.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSupplierRequest'
+      responses:
+        '201':
+          description: Supplier berhasil dibuat.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: supplier created successfully
+                  data:
+                    $ref: '#/components/schemas/SupplierResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: Kode supplier sudah digunakan dalam organisasi.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/suppliers/{id}:
+    get:
+      tags:
+        - Supplier Management
+      summary: Detail Supplier
+      description: Mengambil data lengkap supplier berdasarkan UUID.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: UUID Supplier
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Data supplier berhasil ditemukan.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: supplier retrieved successfully
+                  data:
+                    $ref: '#/components/schemas/SupplierResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags:
+        - Supplier Management
+      summary: Update Data Supplier
+      description: Memperbarui data nama, kode, kontak, alamat, atau status supplier.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: UUID Supplier
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSupplierRequest'
+      responses:
+        '200':
+          description: Supplier berhasil diperbarui.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: supplier updated successfully
+                  data:
+                    $ref: '#/components/schemas/SupplierResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Kode supplier sudah digunakan oleh vendor lain.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+    delete:
+      tags:
+        - Supplier Management
+      summary: Hapus Supplier (Soft Delete)
+      description: Menandai supplier dihapus (soft-delete).
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: UUID Supplier
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Supplier berhasil dihapus.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: supplier deleted successfully
+                  data:
+                    type: object
+                    nullable: true
+                    example: null
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  responses:
+    BadRequest:
+      description: Format request tidak valid.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Unauthorized:
+      description: Autentikasi token tidak ditemukan atau tidak valid.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFound:
+      description: Data tidak ditemukan.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    ValidationError:
+      description: Validasi payload input gagal.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+              error:
+                type: string
+                example: VALIDATION_ERROR
+              message:
+                type: string
+                example: validation failed on one or more fields
+              details:
+                type: object
+
+  schemas:
+    SupplierLookupResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "019488a0-7b56-7104-94e8-8b824b01e401"
+        name:
+          type: string
+          example: "PT Diamond Cold Storage"
+        code:
+          type: string
+          nullable: true
+          example: "SUPP-001"
+        contact_person:
+          type: string
+          nullable: true
+          example: "Budi Santoso"
+        phone:
+          type: string
+          nullable: true
+          example: "08123456789"
+
+    SupplierResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "019488a0-7b56-7104-94e8-8b824b01e401"
+        organization_id:
+          type: string
+          format: uuid
+          example: "019488a0-0000-0000-0000-000000000001"
+        name:
+          type: string
+          example: "PT Diamond Cold Storage"
+        code:
+          type: string
+          nullable: true
+          example: "SUPP-001"
+        contact_person:
+          type: string
+          nullable: true
+          example: "Budi Santoso"
+        phone:
+          type: string
+          nullable: true
+          example: "08123456789"
+        email:
+          type: string
+          nullable: true
+          example: "sales@diamond.co.id"
+        address:
+          type: string
+          nullable: true
+          example: "Kawasan Industri MM2100, Cikarang Barat"
+        status:
+          type: string
+          enum: [ACTIVE, INACTIVE]
+          example: "ACTIVE"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CreateSupplierRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 150
+          example: "PT Diamond Cold Storage"
+        code:
+          type: string
+          maxLength: 50
+          nullable: true
+          example: "SUPP-001"
+        contact_person:
+          type: string
+          maxLength: 100
+          nullable: true
+          example: "Budi Santoso"
+        phone:
+          type: string
+          maxLength: 30
+          nullable: true
+          example: "08123456789"
+        email:
+          type: string
+          format: email
+          maxLength: 100
+          nullable: true
+          example: "sales@diamond.co.id"
+        address:
+          type: string
+          maxLength: 500
+          nullable: true
+          example: "Kawasan Industri MM2100, Cikarang Barat"
+
+    UpdateSupplierRequest:
+      type: object
+      required:
+        - name
+        - status
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 150
+          example: "PT Diamond Cold Storage Indonesia"
+        code:
+          type: string
+          maxLength: 50
+          nullable: true
+          example: "SUPP-001"
+        contact_person:
+          type: string
+          maxLength: 100
+          nullable: true
+          example: "Budi Santoso"
+        phone:
+          type: string
+          maxLength: 30
+          nullable: true
+          example: "08123456789"
+        email:
+          type: string
+          format: email
+          maxLength: 100
+          nullable: true
+          example: "sales@diamond.co.id"
+        address:
+          type: string
+          maxLength: 500
+          nullable: true
+          example: "Kawasan Industri MM2100, Cikarang Barat"
+        status:
+          type: string
+          enum: [ACTIVE, INACTIVE]
+          example: "ACTIVE"
+
+    PaginationMeta:
+      type: object
+      properties:
+        page:
+          type: integer
+          example: 1
+        per_page:
+          type: integer
+          example: 20
+        total:
+          type: integer
+          example: 45
+        total_pages:
+          type: integer
+          example: 3
+
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: string
+          example: DUPLICATE_CODE
+        message:
+          type: string
+          example: supplier code already exists in this organization
